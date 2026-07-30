@@ -24,6 +24,7 @@ export {
   batchDeleteBookmarks,
   sortBookmarks,
   setIconBlob,
+  incrementBookmarkClick,
   type BookmarkIconData,
 } from './db/bookmarks'
 

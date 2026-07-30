@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS bookmarks (
   description_mode TEXT,
   open_method  INTEGER NOT NULL DEFAULT 1,-- 1=新窗口 2=当前页 3=当前页弹层
   sort         INTEGER NOT NULL DEFAULT 0,
+  click_count  INTEGER NOT NULL DEFAULT 0,
   created_at   INTEGER NOT NULL
 );
 

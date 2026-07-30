@@ -27,6 +27,7 @@ export const SETTINGS_KEYS = [
   'content_layout',
   'navigation',
   'footer_html',
+  'most_visited_count',
 ] as const satisfies readonly (keyof Settings)[]
 
 export const PUBLIC_SETTINGS_KEYS = [
@@ -53,6 +54,9 @@ export const PUBLIC_SETTINGS_KEYS = [
   'content_layout',
   'navigation',
   'footer_html',
+  'custom_css',
+  'custom_js',
+  'most_visited_count',
 ] as const satisfies readonly (keyof PublicSettings)[]
 
 export const PUBLIC_DATA_SETTINGS_KEYS = [
@@ -85,5 +89,8 @@ export function toPublicSettings(settings: Settings): PublicSettings {
     content_layout: settings.content_layout,
     navigation: settings.navigation,
     footer_html: settings.footer_html,
+    custom_css: settings.custom_css,
+    custom_js: settings.custom_js,
+    most_visited_count: settings.most_visited_count,
   }
 }

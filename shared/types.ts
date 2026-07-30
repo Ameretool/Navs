@@ -25,6 +25,7 @@ export interface Bookmark {
   description_mode?: DescriptionDisplayMode | null
   open_method: 1 | 2 | 3 // 1=新窗口 2=当前页 3=当前页弹层
   sort: number
+  click_count?: number
   created_at: number
 }
 
@@ -145,6 +146,7 @@ export interface Settings {
   content_layout: ContentLayoutSetting
   navigation: NavigationSetting
   footer_html: string
+  most_visited_count: number
 }
 
 // ========== API 统一响应包络 ==========
@@ -263,6 +265,9 @@ export interface PublicSettings {
   content_layout: ContentLayoutSetting
   navigation: NavigationSetting
   footer_html: string
+  custom_css: string
+  custom_js: string
+  most_visited_count: number
 }
 
 // GET /api/config （极简公开配置，登录页用）

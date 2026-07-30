@@ -43,6 +43,19 @@
       <small>首页大标题字号，建议 28-44px。</small>
     </label>
 
+    <label class="field field-range">
+      <span>经常访问展示数量 <em>{form.most_visited_count === 0 ? '已禁用' : form.most_visited_count}</em></span>
+      <input
+        bind:value={form.most_visited_count}
+        type="range"
+        min="0"
+        max="20"
+        step="1"
+        on:input={() => void syncForm()}
+      />
+      <small>设置首页顶部「经常访问」区域展示的书签上限。设为 0 可完全隐藏该区域。</small>
+    </label>
+
     <label class="toggle-field field-toggle">
       <div class="toggle-copy">
         <span>显示搜索框</span>
@@ -73,7 +86,7 @@
   .field-color,
   .field-range,
   .field-toggle {
-    grid-column: span 3;
+    grid-column: span 4;
   }
 
   @media (max-width: 960px) {

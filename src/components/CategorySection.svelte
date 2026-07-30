@@ -175,6 +175,7 @@
     flex-direction: column;
     gap: 1rem;
     scroll-margin-top: 1.5rem;
+    container-type: inline-size;
   }
 
   .section-header {
@@ -332,8 +333,8 @@
     opacity: 0.9;
   }
 
-  /* 移动端响应式 */
-  @media (max-width: 500px) {
+  /* 移动端/窄容器响应式 */
+  @container (max-width: 500px) {
     .bookmark-grid {
       grid-template-columns: repeat(auto-fill, minmax(var(--mobile-card-min-width, 150px), 1fr));
       gap: var(--mobile-bookmark-grid-gap, 1rem);
@@ -398,7 +399,7 @@
     background: rgba(30, 41, 59, 0.5);
   }
 
-  @media (max-width: 640px) {
+  @container (max-width: 640px) {
     .section-header {
       align-items: flex-start;
       flex-direction: column;

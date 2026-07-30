@@ -67,11 +67,11 @@ describe('bookmark card icon state', () => {
 
   it('uses the original URL when a saved remote icon has no persisted cache', () => {
     const result = state({
-      icon: 'https://www.google.com/s2/favicons?sz=64&domain=example.com',
+      icon: 'https://favicon.im/example.com?larger=true',
       icon_source: 'logo_surf',
     })
 
-    expect(result.iconUrl).toBe('https://www.google.com/s2/favicons?sz=64&domain=example.com')
+    expect(result.iconUrl).toBe('https://favicon.im/example.com?larger=true')
     expect(result.canUseRawHttpIconFallback).toBe(true)
     expect(result.shouldReadLocalIconCache).toBe(true)
   })

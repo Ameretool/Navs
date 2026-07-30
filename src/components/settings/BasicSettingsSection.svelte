@@ -52,6 +52,26 @@
         type="checkbox"
       />
     </div>
+
+    <label class="field field-code">
+      <span>自定义 CSS</span>
+      <textarea
+        bind:value={form.custom_css}
+        placeholder={'例如：body { background: #f0f0f0 !important; } 或自定义其它卡片/字体样式。'}
+        on:input={() => void syncForm()}
+      ></textarea>
+      <small>添加自定义 CSS 样式，实时注入到前台首页，可用于微调布局或覆盖默认配色。</small>
+    </label>
+
+    <label class="field field-code">
+      <span>自定义 JavaScript</span>
+      <textarea
+        bind:value={form.custom_js}
+        placeholder="例如：console.log('Hello CF-Navs!');"
+        on:input={() => void syncForm()}
+      ></textarea>
+      <small class="warn">警告：请确保脚本安全，注入的 JS 会在前端页面加载时直接执行。</small>
+    </label>
   </div>
 </fieldset>
 
@@ -66,6 +86,10 @@
 
   .field-toggle {
     grid-column: span 4;
+  }
+
+  .field-code {
+    grid-column: span 12;
   }
 
   @media (max-width: 960px) {

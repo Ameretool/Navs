@@ -15,7 +15,7 @@ describe('icon helpers', () => {
     expect(getHostname('https://www.example.com/path')).toBe('example.com')
     expect(getHostname('not a url')).toBe('')
     expect(faviconImIcon('https://www.example.com/path')).toBe('https://favicon.im/example.com?larger=true')
-    expect(googleIcon('https://example.com', 128)).toBe('https://www.google.com/s2/favicons?sz=128&domain=example.com')
+    expect(googleIcon('https://example.com', 128)).toBe('https://favicon.im/example.com?larger=true')
   })
 
   it('normalizes Iconify names and known Iconify URLs', () => {

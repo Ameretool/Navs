@@ -4,6 +4,7 @@ export type HomeSection = {
   id: string
   title: string
   count: number
+  icon?: string | null
 }
 
 export function clampTitleFontSize(value: number | undefined): number {
@@ -67,12 +68,24 @@ export function groupBookmarksByCategory(items: PublicBookmark[]): Map<number, P
 export function getHomeSections(
   categories: PublicCategory[],
   categoryBookmarks: Map<number, PublicBookmark[]>,
+  hasMostVisited = false,
+  mostVisitedCount = 0,
 ): HomeSection[] {
-  return categories.map((category) => ({
+  const list: HomeSection[] = categories.map((category) => ({
     id: `category-${category.id}`,
     title: category.title,
     count: categoryBookmarks.get(category.id)?.length ?? 0,
+    icon: category.icon,
   }))
+  if (hasMostVisited && mostVisitedCount > 0) {
+    list.unshift({
+      id: 'category-most-visited',
+      title: '经常访问',
+      count: mostVisitedCount,
+      icon: '🔥',
+    })
+  }
+  return list
 }
 
 export function getHomeSectionsKey(sections: HomeSection[]): string {

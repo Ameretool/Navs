@@ -2,6 +2,8 @@
   import { onDestroy, onMount } from 'svelte'
   import type { CardStyle, DescriptionDisplayMode, PublicBookmark } from '../../shared/types'
   import BookmarkCardCompact from './BookmarkCardCompact.svelte'
+  import { publicStore } from '../lib/stores'
+  import { api } from '../lib/api'
   import BookmarkCardInfo from './BookmarkCardInfo.svelte'
   import BookmarkContextMenu from './BookmarkContextMenu.svelte'
   import BookmarkLinkModal from './BookmarkLinkModal.svelte'
@@ -187,6 +189,11 @@
       event.preventDefault()
       return
     }
+
+    // Register click both locally and on server
+    publicStore.incrementClick(bookmark.id)
+    void api.public.registerClick(bookmark.id)
+
     if (!shouldOpenBookmarkModal({ sortMode, openMethod: bookmark.open_method })) return
     event.preventDefault()
     modalOpen = true

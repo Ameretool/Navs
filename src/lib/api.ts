@@ -347,6 +347,8 @@ export const configApi = {
 export const publicApi = {
   getData: (auth = false) =>
     request<PublicData>('/public/data', { auth, cache: 'no-store', headers: NO_CACHE_HEADERS }),
+  registerClick: (id: number) =>
+    request<null>(`/public/bookmarks/${id}/click`, { method: 'POST' }),
 }
 
 export const adminApi = {
@@ -378,6 +380,8 @@ export const bookmarksApi = {
   remove: (id: number) => request<null>(`/bookmarks/${id}`, { method: 'DELETE', auth: true }),
   batchDelete: (ids: number[]) => jsonRequest<BatchDeleteBookmarksResp>('/bookmarks/batch-delete', 'POST', { ids }, true),
   sort: (ids: SortReq['ids']) => jsonRequest<null>('/bookmarks/sort', 'POST', { ids }, true),
+  checkHealth: (ids: number[]) =>
+    jsonRequest<Array<{ id: number; status: number | string; ok: boolean }>>('/bookmarks/check-health', 'POST', { ids }, true),
   fetchFavicon: (url: string) => request<FaviconResp>(`/fetch-favicon?url=${encodeURIComponent(url)}`, { auth: true }),
 }
 

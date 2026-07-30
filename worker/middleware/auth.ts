@@ -2,6 +2,7 @@ import type { MiddlewareHandler } from 'hono'
 import { ErrCode } from '../../shared/types'
 import { fail } from '../lib/response'
 import type { Env, HonoEnv, SessionValue } from '../types'
+import { getJwtSecret, verifyJwt, rotateJwtSecret } from '../lib/jwt'
 
 const SESSION_PREFIX = 'sess:'
 const SESSION_MEMORY_CACHE_TTL_MS = 15_000
@@ -62,13 +63,7 @@ export function clearAllCachedSessions(): void {
 }
 
 export async function clearAllSessions(env: Env): Promise<void> {
-  let cursor: string | undefined
-
-  do {
-    const page = await env.SESSION.list({ prefix: SESSION_PREFIX, cursor })
-    await Promise.all(page.keys.map((key) => env.SESSION.delete(key.name)))
-    cursor = page.list_complete ? undefined : page.cursor
-  } while (cursor)
+  await rotateJwtSecret(env.DB)
 }
 
 export async function validateSession(env: Env, token: string): Promise<SessionValue | null> {
@@ -81,20 +76,19 @@ export async function validateSession(env: Env, token: string): Promise<SessionV
     sessionMemoryCache.delete(token)
   }
 
-  const raw = await env.SESSION.get(getSessionKey(token))
-  if (!raw) return null
-
-  let session: SessionValue
-  try {
-    session = JSON.parse(raw) as SessionValue
-  } catch {
-    await env.SESSION.delete(getSessionKey(token))
+  const secret = await getJwtSecret(env.DB)
+  const payload = await verifyJwt(token, secret)
+  if (!payload) {
     sessionMemoryCache.delete(token)
     return null
   }
 
+  const session: SessionValue = {
+    username: payload.username as string,
+    exp: payload.exp as number,
+  }
+
   if (!session.username || typeof session.exp !== 'number' || session.exp <= Date.now()) {
-    await env.SESSION.delete(getSessionKey(token))
     sessionMemoryCache.delete(token)
     return null
   }

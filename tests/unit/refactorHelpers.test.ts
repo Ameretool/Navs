@@ -128,8 +128,8 @@ describe('refactored helper modules', () => {
     expect(bookmarkMatchesSearch(bookmarkA, normalizeSearchQuery('tools'), searchIndex)).toBe(true)
     expect(getVisibleCategoryIds([bookmarkB])).toEqual(new Set([2]))
     expect(getHomeSections(sortedCategories, grouped)).toEqual([
-      { id: 'category-2', title: 'Docs', count: 1 },
-      { id: 'category-1', title: 'Tools', count: 1 },
+      { id: 'category-2', title: 'Docs', count: 1, icon: null },
+      { id: 'category-1', title: 'Tools', count: 1, icon: null },
     ])
   })
 

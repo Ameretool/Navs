@@ -7,6 +7,7 @@
   import BackupPanel from '../BackupPanel.svelte'
   import BookmarkListPanel from './BookmarkListPanel.svelte'
   import CategoryListPanel from './CategoryListPanel.svelte'
+  import AnalyticsPanel from './AnalyticsPanel.svelte'
 
   type AdminCategory = AdminCategorySummary
   type AdminBookmark = AdminBookmarkSummary
@@ -77,6 +78,11 @@
       {onDeleteBookmark}
       {onBatchDeleteBookmarks}
       {onSortBookmarks}
+    />
+  {:else if activeTab === 'analytics'}
+    <AnalyticsPanel
+      {bookmarks}
+      {categories}
     />
   {:else if activeTab === 'settings'}
     <section class="settings-panel-wrap">

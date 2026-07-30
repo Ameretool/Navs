@@ -1,4 +1,4 @@
-﻿<script lang="ts">
+<script lang="ts">
   import type { AdminBookmarkSummary, AdminCategorySummary } from '../../lib/appData'
   import {
     clampAdminListPage,
@@ -124,6 +124,42 @@
     search = (event.currentTarget as HTMLInputElement).value
     page = 1
   }
+
+  import { api } from '../../lib/api'
+
+  let checkingHealth = false
+  let healthProgress = 0
+  let healthTotal = 0
+  let healthResults = new Map<number, { status: number | string; ok: boolean }>()
+
+  async function checkBookmarksHealth() {
+    if (checkingHealth || bookmarks.length === 0) return
+    checkingHealth = true
+    healthProgress = 0
+    healthTotal = bookmarks.length
+    healthResults = new Map()
+
+    const bookmarkIds = bookmarks.map((b) => Number(b.id))
+    const BATCH_SIZE = 10
+
+    try {
+      for (let offset = 0; offset < bookmarkIds.length; offset += BATCH_SIZE) {
+        const batchIds = bookmarkIds.slice(offset, offset + BATCH_SIZE)
+        const res = await api.bookmarks.checkHealth(batchIds)
+        if (res) {
+          for (const item of res) {
+            healthResults.set(item.id, { status: item.status, ok: item.ok })
+          }
+          healthProgress = Math.min(offset + BATCH_SIZE, healthTotal)
+          healthResults = healthResults
+        }
+      }
+    } catch (err) {
+      console.error('Failed to run health check:', err)
+    } finally {
+      checkingHealth = false
+    }
+  }
 </script>
 
 <div class="admin-list-view">
@@ -142,6 +178,20 @@
         >
           排序
         </button>
+        {#if checkingHealth}
+          <div class="admin-health-progress">
+            正在检测 ({healthProgress}/{healthTotal})
+          </div>
+        {:else}
+          <button
+            type="button"
+            class="admin-ghost-button"
+            on:click={checkBookmarksHealth}
+            disabled={sortMode || !isAuthenticated || bookmarksLoading || authLoading || bookmarks.length === 0}
+          >
+            检测链接健康
+          </button>
+        {/if}
         <button type="button" class="admin-danger-button" on:click={() => onBatchDeleteBookmarks?.([...selectedIds])} disabled={!isAuthenticated || selectedIds.size === 0}>删除已选 ({selectedIds.size})</button>
         {#if selectedIds.size > 0}<button type="button" class="admin-ghost-button" on:click={() => selectedIds = new Set()}>清除选择</button>{/if}
         <button
@@ -192,7 +242,7 @@
                 {#if !sortMode}<th style="width: 44px;"><input type="checkbox" aria-label="全选当前页" checked={pageSelectedCount === pageIds.length && pageIds.length > 0} use:indeterminate={pageSelectedCount > 0 && pageSelectedCount < pageIds.length} on:change={togglePageSelection} /></th>{/if}
                 {#if sortMode}<th style="width: 44px;">排序</th>{/if}
                 {#each sortColumns as column}
-                  <th aria-sort={sortField === column.field ? (sortDirection === 'asc' ? 'ascending' : sortDirection === 'desc' ? 'descending' : 'none') : 'none'}><button type="button" class="sort-header-button" aria-label={sortButtonLabel(column.field, column.label)} on:click={() => toggleField(column.field)} disabled={sortMode}>{column.label}<svg viewBox="0 0 16 16" aria-hidden="true"><path d={sortField === column.field && sortDirection === 'asc' ? 'M8 3 4 7h3v6h2V7h3L8 3Z' : sortField === column.field && sortDirection === 'desc' ? 'm8 13 4-4H9V3H7v6H4l4 4Z' : 'm5 2-3 3h2v6h2V5h2L5 2Zm6 12 3-3h-2V5h-2v6H8l3 3Z'} /></svg></button></th>
+                  <th class="col-{column.field}" aria-sort={sortField === column.field ? (sortDirection === 'asc' ? 'ascending' : sortDirection === 'desc' ? 'descending' : 'none') : 'none'}><button type="button" class="sort-header-button" aria-label={sortButtonLabel(column.field, column.label)} on:click={() => toggleField(column.field)} disabled={sortMode}>{column.label}<svg viewBox="0 0 16 16" aria-hidden="true"><path d={sortField === column.field && sortDirection === 'asc' ? 'M8 3 4 7h3v6h2V7h3L8 3Z' : sortField === column.field && sortDirection === 'desc' ? 'm8 13 4-4H9V3H7v6H4l4 4Z' : 'm5 2-3 3h2v6h2V5h2L5 2Zm6 12 3-3h-2V5h-2v6H8l3 3Z'} /></svg></button></th>
                 {/each}
                 {#if !sortMode}<th style="width: 122px;">操作</th>{/if}
               </tr>
@@ -245,11 +295,21 @@
                       </div>
                     </div>
                   </td>
-                  <td class="admin-url-cell">
-                    <a href={bookmark.url} target="_blank" rel="noreferrer">{bookmark.url}</a>
+                  <td class="admin-url-cell col-url">
+                    <div class="admin-url-badge-wrap">
+                      <a href={bookmark.url} target="_blank" rel="noreferrer">{bookmark.url}</a>
+                      {#if healthResults.has(Number(bookmark.id))}
+                        {@const result = healthResults.get(Number(bookmark.id))}
+                        {#if result && result.ok}
+                          <span class="health-badge ok">200 OK</span>
+                        {:else if result}
+                          <span class="health-badge error" title={`连接错误: ${result.status}`}>{result.status}</span>
+                        {/if}
+                      {/if}
+                    </div>
                   </td>
-                  <td class="admin-cat-cell">{getCategoryTitle(bookmark.category_id)}</td>
-                  <td class="admin-method-cell">
+                  <td class="admin-cat-cell col-category">{getCategoryTitle(bookmark.category_id)}</td>
+                  <td class="admin-method-cell col-open-method">
                     {bookmark.open_method === 'same_tab' ? '当前标签页' : bookmark.open_method === 'modal' ? '当前页弹层' : '新标签页'}
                   </td>
                   {#if !sortMode}

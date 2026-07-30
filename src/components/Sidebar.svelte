@@ -7,7 +7,7 @@
     writeLeftNavigationCollapsed,
   } from '../lib/navigationLayout'
 
-  export let items: Array<{ id: string | number; title: string; count?: number }> = []
+  export let items: Array<{ id: string | number; title: string; count?: number; icon?: string | null }> = []
   export let activeId: string | number | null = null
   export let navigation: NavigationSetting = { position: 'left', always_expanded: false }
   export let onNavigate: ((id: string | number) => void) | undefined = undefined
@@ -293,6 +293,13 @@
           aria-current={activeId === item.id ? 'location' : undefined}
           on:click={() => handleItemClick(item.id)}
         >
+          {#if item.icon}
+            {#if item.icon.startsWith('http') || item.icon.startsWith('data:image')}
+              <img class="top-icon-img" src={item.icon} alt="" />
+            {:else}
+              <span class="top-icon-text">{item.icon}</span>
+            {/if}
+          {/if}
           <span>{item.title}</span>
           {#if item.count != null}<small>{item.count}</small>{/if}
         </button>
@@ -362,7 +369,17 @@
           aria-current={activeId === item.id ? 'location' : undefined}
           on:click={() => handleItemClick(item.id)}
         >
-          <span class="toc-slip"></span>
+          {#if item.icon}
+            <span class="toc-icon-container">
+              {#if item.icon.startsWith('http') || item.icon.startsWith('data:image')}
+                <img class="toc-icon-img" src={item.icon} alt="" />
+              {:else}
+                <span class="toc-icon-text">{item.icon}</span>
+              {/if}
+            </span>
+          {:else}
+            <span class="toc-slip"></span>
+          {/if}
           <span class="toc-title">{item.title}</span>
         </button>
       {/each}
@@ -745,5 +762,55 @@
       scroll-behavior: auto;
       transition: none;
     }
+  }
+
+  .toc-icon-container {
+    width: 40px;
+    height: 34px;
+    flex: 0 0 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .toc-icon-text {
+    font-size: 1.25rem;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .toc-icon-img {
+    width: 1.35rem;
+    height: 1.35rem;
+    object-fit: cover;
+    border-radius: 6px;
+    border: 1px solid rgba(148, 163, 184, 0.12);
+  }
+
+  .toc-item:hover .toc-icon-container,
+  .toc-item:focus-visible .toc-icon-container {
+    transform: scale(1.18);
+  }
+
+  .toc-item.active .toc-icon-container {
+    filter: drop-shadow(0 0 4px var(--toc-accent));
+  }
+
+  .top-icon-text {
+    font-size: 1.15rem;
+    line-height: 1;
+    margin-right: 4px;
+  }
+
+  .top-icon-img {
+    width: 1.2rem;
+    height: 1.2rem;
+    object-fit: cover;
+    border-radius: 5px;
+    border: 1px solid rgba(148, 163, 184, 0.12);
+    margin-right: 4px;
   }
 </style>

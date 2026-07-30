@@ -82,8 +82,27 @@
     ? sortedCategories.filter((category) => visibleCategoryIds?.has(category.id))
     : sortedCategories
 
+  const mostVisitedCategory = {
+    id: -99,
+    title: '经常访问',
+    icon: '🔥',
+    sort: -1,
+  }
+
+  $: mostVisitedBookmarks = !hasSearchQuery && (settings?.most_visited_count ?? 8) > 0
+    ? bookmarks
+        .filter((bm) => (bm.click_count ?? 0) > 0)
+        .sort((a, b) => (b.click_count ?? 0) - (a.click_count ?? 0))
+        .slice(0, settings?.most_visited_count ?? 8)
+    : []
+
   $: categoryBookmarks = groupBookmarksByCategory(visibleBookmarks)
-  $: sections = getHomeSections(visibleCategories, categoryBookmarks)
+  $: sections = getHomeSections(
+    visibleCategories,
+    categoryBookmarks,
+    !hasSearchQuery,
+    mostVisitedBookmarks.length
+  )
   $: nextSectionsKey = getHomeSectionsKey(sections)
   $: if (nextSectionsKey !== sectionsKey) {
     sectionsKey = nextSectionsKey
@@ -328,7 +347,82 @@
     }, NAV_SCROLL_RELEASE_DELAY_MS)
   }
 
+  function getVisibleBookmarkElements(): HTMLElement[] {
+    if (typeof document === 'undefined') return []
+    return Array.from(document.querySelectorAll<HTMLElement>('.bookmark-card-shell .bookmark-card'))
+  }
+
+  function focusFirstVisibleBookmark() {
+    const cards = getVisibleBookmarkElements()
+    if (cards.length > 0) {
+      cards[0].focus()
+    }
+  }
+
+  function focusNextBookmark(currentCard: Element) {
+    const cards = getVisibleBookmarkElements()
+    const index = cards.indexOf(currentCard as HTMLElement)
+    if (index !== -1 && index < cards.length - 1) {
+      cards[index + 1].focus()
+    }
+  }
+
+  function focusPrevBookmark(currentCard: Element) {
+    const cards = getVisibleBookmarkElements()
+    const index = cards.indexOf(currentCard as HTMLElement)
+    if (index > 0) {
+      cards[index - 1].focus()
+    }
+  }
+
+  function handleGlobalKeydown(event: KeyboardEvent) {
+    if (typeof document === 'undefined') return
+
+    const activeEl = document.activeElement
+    if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.hasAttribute('contenteditable'))) {
+      if (activeEl.id === 'search-query') {
+        if (event.key === 'Escape') {
+          searchQuery = ''
+          ;(activeEl as HTMLInputElement).blur()
+          event.preventDefault()
+        } else if (event.key === 'ArrowDown') {
+          focusFirstVisibleBookmark()
+          event.preventDefault()
+        }
+      }
+      return
+    }
+
+    if ((event.ctrlKey && event.key.toLowerCase() === 'k') || event.key === '/') {
+      const searchInput = document.getElementById('search-query')
+      if (searchInput) {
+        event.preventDefault()
+        searchInput.focus()
+        ;(searchInput as HTMLInputElement).select()
+      }
+      return
+    }
+
+    if (activeEl && activeEl.classList.contains('bookmark-card')) {
+      if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
+        event.preventDefault()
+        focusNextBookmark(activeEl)
+      } else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
+        event.preventDefault()
+        focusPrevBookmark(activeEl)
+      } else if (event.key === 'Escape') {
+        event.preventDefault()
+        const searchInput = document.getElementById('search-query')
+        if (searchInput) {
+          searchInput.focus()
+          ;(searchInput as HTMLInputElement).select()
+        }
+      }
+    }
+  }
 </script>
+
+<svelte:window on:keydown={handleGlobalKeydown} />
 
 <svelte:head>
   <title>{pageTitle}</title>
@@ -354,9 +448,6 @@
   />
 
   <HomeHeroSearch
-    {pageTitle}
-    {siteTitleColor}
-    {siteTitleFontSize}
     {settings}
     topNavigation={isTopNavigation}
     bind:query={searchQuery}
@@ -380,8 +471,27 @@
         {totalBookmarks}
       />
 
-      {#if visibleCategories.length > 0}
+      {#if visibleCategories.length > 0 || mostVisitedBookmarks.length > 0}
         <div class="section-list" class:is-navigation-layout-ready={navigationLayoutReady}>
+          {#if mostVisitedBookmarks.length > 0}
+            <div class="section-shell" data-section-id="category-most-visited">
+              <CategorySection
+                category={mostVisitedCategory}
+                bookmarks={mostVisitedBookmarks}
+                canAddBookmark={false}
+                cardWidth={settings?.card_size?.width ?? 80}
+                cardHeight={settings?.card_size?.height ?? 60}
+                cardStyle={settings?.card_style ?? 'info'}
+                cardIconSize={settings?.card_icon_size ?? 60}
+                cardShowDescription={settings?.card_show_description ?? true}
+                cardDescriptionMode={settings?.card_description_mode ?? (settings?.card_show_description === false ? 'hidden' : 'always')}
+                cardIconShowTitle={settings?.card_icon_show_title ?? true}
+                canSort={false}
+                onEditBookmark={onEditBookmark}
+              />
+            </div>
+          {/if}
+
           {#each visibleCategories as category (category.id)}
             <div class="section-shell" data-section-id={`category-${category.id}`}>
               <CategorySection

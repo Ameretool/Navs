@@ -28,3 +28,6 @@ docs/local/
 docs/drafts/
 docs/screenshots/local-*
 docs/screenshots/test-*
+
+# IDE configuration
+.idea/
