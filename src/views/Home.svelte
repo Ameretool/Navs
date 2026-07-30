@@ -448,6 +448,9 @@
   />
 
   <HomeHeroSearch
+    {pageTitle}
+    {siteTitleColor}
+    {siteTitleFontSize}
     {settings}
     topNavigation={isTopNavigation}
     bind:query={searchQuery}

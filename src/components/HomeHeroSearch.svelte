@@ -2,12 +2,18 @@
   import type { PublicSettings } from '../../shared/types'
   import SearchBox from './SearchBox.svelte'
 
+  export let pageTitle = ''
+  export let siteTitleColor = 'inherit'
+  export let siteTitleFontSize = 32
   export let settings: PublicSettings | null = null
   export let query = ''
   export let topNavigation = false
 </script>
 
 <section class="hero-search" class:top-navigation={topNavigation} aria-label="站点搜索">
+  {#if settings?.site_title_show ?? true}
+    <h1 class="site-title" style="color: {siteTitleColor}; font-size: {siteTitleFontSize}px; -webkit-text-fill-color: {siteTitleColor === 'inherit' ? 'initial' : siteTitleColor}; background: none; -webkit-background-clip: unset;">{pageTitle}</h1>
+  {/if}
   {#if settings?.search_box_show ?? true}
     <div class="search-card">
       <SearchBox
@@ -30,6 +36,14 @@
 
   .hero-search.top-navigation {
     margin-top: calc(3.5rem + var(--content-margin-top, 0%));
+  }
+
+  .site-title {
+    margin: 0;
+    font-weight: 700;
+    line-height: 1.1;
+    overflow-wrap: anywhere;
+    text-shadow: 0 2px 12px rgba(15, 23, 42, 0.22);
   }
 
   .search-card {

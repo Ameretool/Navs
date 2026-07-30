@@ -58,6 +58,7 @@ INSERT OR IGNORE INTO settings (key, value) VALUES
   ('custom_css', '""'),
   ('custom_js', '""'),
   ('image_host_url', '""'),
+  ('site_title_show', 'true'),
   ('search_engine', '{"current":"Google","engines":[{"name":"Google","icon":"","url_template":"https://www.google.com/search?q={q}"},{"name":"Bing","icon":"","url_template":"https://www.bing.com/search?q={q}"}]}'),
   ('card_size', '{"width":80,"height":60}'),
   ('card_style', '"info"'),

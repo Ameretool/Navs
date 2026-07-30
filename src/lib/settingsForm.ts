@@ -78,6 +78,7 @@ export const emptySettingsForm: SettingsFormModel = {
   navigation: { position: 'left', always_expanded: false },
   footer_html: '',
   most_visited_count: 8,
+  site_title_show: true,
 }
 
 export function cloneSettingsForm(source: SettingsFormModel): SettingsFormModel {
@@ -115,6 +116,7 @@ export function cloneSettingsForm(source: SettingsFormModel): SettingsFormModel 
     navigation: { ...source.navigation },
     footer_html: source.footer_html,
     most_visited_count: source.most_visited_count,
+    site_title_show: source.site_title_show,
   }
 }
 
@@ -228,6 +230,7 @@ export function createSettingsFormState(
     },
     footer_html: source?.footer_html ?? '',
     most_visited_count: typeof source?.most_visited_count === 'number' ? source.most_visited_count : 8,
+    site_title_show: source?.site_title_show ?? true,
   }
 }
 
@@ -309,6 +312,7 @@ export function normalizeSettingsForm(source: SettingsFormModel): SettingsFormMo
     },
     footer_html: source.footer_html.trim(),
     most_visited_count: clampNumber(source.most_visited_count, 0, 20),
+    site_title_show: Boolean(source.site_title_show),
   }
 }
 

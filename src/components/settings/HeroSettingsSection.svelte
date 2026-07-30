@@ -58,6 +58,18 @@
 
     <label class="toggle-field field-toggle">
       <div class="toggle-copy">
+        <span>显示站点标题</span>
+        <p>关闭后首页不再展示大标题字样。</p>
+      </div>
+      <input
+        bind:checked={form.site_title_show}
+        on:change={() => void syncForm()}
+        type="checkbox"
+      />
+    </label>
+
+    <label class="toggle-field field-toggle">
+      <div class="toggle-copy">
         <span>显示搜索框</span>
         <p>关闭后首页只保留标题和书签列表。</p>
       </div>

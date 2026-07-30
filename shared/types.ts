@@ -147,6 +147,7 @@ export interface Settings {
   navigation: NavigationSetting
   footer_html: string
   most_visited_count: number
+  site_title_show: boolean
 }
 
 // ========== API 统一响应包络 ==========
@@ -268,6 +269,7 @@ export interface PublicSettings {
   custom_css: string
   custom_js: string
   most_visited_count: number
+  site_title_show: boolean
 }
 
 // GET /api/config （极简公开配置，登录页用）
