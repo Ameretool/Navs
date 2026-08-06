@@ -271,8 +271,8 @@ SESSION_TTL = "604800"             # 会话有效期（7天）
 
 - 密码使用 WebCrypto PBKDF2 哈希存储
 - Session token 随机生成
-- CSRF 防护（SameSite cookie）
-- XSS 防护（内容转义）
+- Bearer Session Token 通过 `Authorization` 请求头发送，不使用 Cookie，因此没有基于 Cookie 的 CSRF 攻击面
+- Session Token 保存在浏览器 `localStorage`；严格 CSP、同源脚本限制和输出转义共同降低 XSS 窃取风险
 - 管理员操作鉴权
 - Secret 管理（Wrangler secrets）
 

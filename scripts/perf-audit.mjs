@@ -3,8 +3,13 @@
 // Usage:
 //   ADMIN_USER=admin ADMIN_PASS=... node scripts/perf-audit.mjs
 //
+// The target origin and browser defaults come from the git-ignored
+// verify.local.json in the repository root. Credentials remain environment-only.
+// Environment variables win over local configuration.
+// See verify.local.example.json for the template.
+//
 // Optional env:
-//   BASE_URL=https://navs.bjlius.com
+//   BASE_URL=https://your-cf-navs-domain.example
 //   CHROME_DEBUG_PORT=9223
 //   PERF_AUDIT_ALLOW_FAILURES=1
 //   PERF_MAX_FAILED_REQUESTS=0
@@ -13,8 +18,10 @@
 //   PERF_MIN_BOOKMARK_CARDS=300
 //   PERF_MAX_ICON_REQUESTS=260
 
-const BASE_URL = (process.env.BASE_URL || 'https://navs.bjlius.com').replace(/\/+$/, '')
-const CHROME_DEBUG_PORT = process.env.CHROME_DEBUG_PORT || '9223'
+import { resolveBaseUrl, resolveSetting } from './lib/verifyTarget.mjs'
+
+const BASE_URL = resolveBaseUrl()
+const CHROME_DEBUG_PORT = resolveSetting('CHROME_DEBUG_PORT', 'chromeDebugPort', '9223')
 const ADMIN_USER = process.env.ADMIN_USER || ''
 const ADMIN_PASS = process.env.ADMIN_PASS || ''
 const ALLOW_FAILURES = process.env.PERF_AUDIT_ALLOW_FAILURES === '1'

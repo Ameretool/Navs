@@ -3,11 +3,17 @@
 // Required:
 //   ADMIN_USER=admin ADMIN_PASS=... npm run regression:chrome
 //
+// The target origin and browser defaults come from the git-ignored
+// verify.local.json in the repository root. Credentials remain environment-only.
+// Environment variables win over local configuration.
+// See verify.local.example.json for the template.
+//
 // Optional:
-//   BASE_URL=https://navs.bjlius.com
+//   BASE_URL=https://your-cf-navs-domain.example
 //   CHROME_DEBUG_PORT=9228
 //   CHROME_EXE="C:\Program Files\Google\Chrome\Application\chrome.exe"
-//   CHROME_USER_DATA_DIR=D:\tmp\cf-navs-chrome-profile-9228
+//   CHROME_PROFILE_ROOT=<parent directory for the temporary profile; defaults to the OS temp dir>
+//   CHROME_USER_DATA_DIR=<full profile path; must end with cf-navs-chrome-profile-<id>>
 //   REGRESSION_ALLOW_EXISTING_CHROME=1  # opt in only for a dedicated existing test browser
 //   REGRESSION_FORCE_TEMP_CHROME=1
 //   REGRESSION_ALLOW_FAILURES=1
@@ -21,12 +27,16 @@ import { existsSync } from 'node:fs'
 import { mkdir, readFile, rm } from 'node:fs/promises'
 import path from 'node:path'
 import WebSocket from 'ws'
+import { resolveBaseUrl, resolveChromeProfileRoot, resolveSetting } from './lib/verifyTarget.mjs'
 
-const BASE_URL = (process.env.BASE_URL || 'https://navs.bjlius.com').replace(/\/+$/, '')
-const CHROME_DEBUG_PORT = process.env.CHROME_DEBUG_PORT || '9228'
-const CHROME_EXE = process.env.CHROME_EXE || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
+const BASE_URL = resolveBaseUrl()
+const CHROME_DEBUG_PORT = resolveSetting('CHROME_DEBUG_PORT', 'chromeDebugPort', '9228')
+const CHROME_EXE = resolveSetting('CHROME_EXE', 'chromeExe', 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe')
+// profile 目录名必须保持 cf-navs-chrome-profile-<id>，清理逻辑依赖它来确保永远不会
+// 删除用户的正常 Chrome profile。
 const CHROME_USER_DATA_DIR =
-  process.env.CHROME_USER_DATA_DIR || `D:\\tmp\\cf-navs-chrome-profile-${CHROME_DEBUG_PORT}`
+  resolveSetting('CHROME_USER_DATA_DIR', 'chromeUserDataDir') ||
+  path.join(resolveChromeProfileRoot(), `cf-navs-chrome-profile-${CHROME_DEBUG_PORT}`)
 const SAFE_TEMP_PROFILE = /^cf-navs-chrome-profile-[a-z0-9_-]+$/i.test(path.basename(path.resolve(CHROME_USER_DATA_DIR)))
 const ADMIN_USER = process.env.ADMIN_USER || ''
 const ADMIN_PASS = process.env.ADMIN_PASS || ''

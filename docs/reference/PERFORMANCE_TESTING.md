@@ -19,11 +19,26 @@ http://127.0.0.1:9223
 
 Each script creates a dedicated test tab for `BASE_URL`, logs in through the page, runs the audit, prints JSON metrics, removes `cf-navs.auth`, and closes only that test tab before exit. Existing user tabs are never reused or closed.
 
+## Local Target Configuration
+
+Copy the tracked template once, then put the real deployment origin in the git-ignored local file:
+
+```powershell
+Copy-Item verify.local.example.json verify.local.json
+```
+
+```json
+{
+  "baseUrl": "https://your-cf-navs-domain.example",
+  "chromeDebugPort": "9223"
+}
+```
+
+`verify.local.json` may contain deployment origin and browser settings, but never administrator credentials. `BASE_URL`, `CHROME_DEBUG_PORT`, `CHROME_EXE`, `CHROME_PROFILE_ROOT`, and `CHROME_USER_DATA_DIR` environment variables override matching local values. A missing target fails immediately instead of falling back to another deployment.
+
 ## Run
 
 ```powershell
-$env:BASE_URL = 'https://navs.bjlius.com'
-$env:CHROME_DEBUG_PORT = '9223'
 $env:ADMIN_USER = '<admin user>'
 $env:ADMIN_PASS = '<admin password>'
 npm run perf:audit
@@ -32,14 +47,13 @@ npm run perf:audit
 Functional regression:
 
 ```powershell
-$env:BASE_URL = 'https://navs.bjlius.com'
 $env:CHROME_DEBUG_PORT = '9228'
 $env:ADMIN_USER = '<admin user>'
 $env:ADMIN_PASS = '<admin password>'
 npm run regression:chrome
 ```
 
-By default `regression:chrome` starts a temporary Chrome profile under `D:\tmp\cf-navs-chrome-profile-<port>`. Its `finally` cleanup closes the test-owned browser, stops only Chrome processes matching that exact profile, verifies the remaining process count is zero, and then removes the profile.
+By default `regression:chrome` starts a temporary Chrome profile under the operating system temporary directory, named `cf-navs-chrome-profile-<port>`. Its `finally` cleanup closes the test-owned browser, stops only Chrome processes matching that exact profile, verifies the remaining process count is zero, and then removes the profile.
 
 When Chrome is already running with a dynamic DevTools port, the script can connect through the browser websocket only if `REGRESSION_ALLOW_EXISTING_CHROME=1` and `CHROME_DEVTOOLS_ACTIVE_PORT_FILE` are set for a browser dedicated to this test. In that mode the JSON output reports `browserConnectionMode: "dedicated-existing-browser"` and does not start a temporary Chrome process. The helper `scripts/discover-devtools.ps1` never scans the default Chrome profile; existing-browser discovery requires an explicit active-port file and opt-in switch.
 
@@ -57,7 +71,7 @@ For unattended runs where an existing Chrome profile must not be used, force a t
 ```powershell
 $env:REGRESSION_FORCE_TEMP_CHROME = '1'
 $env:CHROME_DEBUG_PORT = '9230'
-$env:CHROME_USER_DATA_DIR = 'D:\tmp\cf-navs-chrome-profile-9230'
+$env:CHROME_USER_DATA_DIR = "$env:TEMP\cf-navs-chrome-profile-9230"
 npm run regression:chrome
 ```
 
