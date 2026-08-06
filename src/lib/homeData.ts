@@ -1,9 +1,30 @@
 import type { PublicBookmark, PublicCategory } from '../../shared/types'
+import {
+  buildCategoryForest,
+  filterCategoryForest,
+  flattenCategoryForest,
+  getCategoryPathMap,
+  normalizeCategories,
+  type CategoryNode,
+} from '../../shared/categoryHierarchy'
 
 export type HomeSection = {
   id: string
+  categoryId: number
   title: string
+  icon: string | null
   count: number
+  children: HomeSection[]
+}
+
+export type HomeCategorySelection = {
+  root: CategoryNode<PublicCategory> | null
+  child: CategoryNode<PublicCategory> | null
+}
+
+export type HomeCategoryGroup = {
+  root: CategoryNode<PublicCategory>
+  selected: CategoryNode<PublicCategory>
 }
 
 export function clampTitleFontSize(value: number | undefined): number {
@@ -64,37 +85,117 @@ export function groupBookmarksByCategory(items: PublicBookmark[]): Map<number, P
   return grouped
 }
 
-export function getHomeSections(
-  categories: PublicCategory[],
+export function getCategoryTreeBookmarkCount(
+  category: CategoryNode<PublicCategory>,
   categoryBookmarks: Map<number, PublicBookmark[]>,
-): HomeSection[] {
-  return categories.map((category) => ({
-    id: `category-${category.id}`,
-    title: category.title,
-    count: categoryBookmarks.get(category.id)?.length ?? 0,
-  }))
+): number {
+  return (categoryBookmarks.get(category.id)?.length ?? 0)
+    + category.children.reduce(
+      (total, child) => total + (categoryBookmarks.get(child.id)?.length ?? 0),
+      0,
+    )
 }
 
-export function getHomeSectionsKey(sections: HomeSection[]): string {
-  return sections.map((section) => section.id).join('|')
+export function getHomeSections(
+  categories: CategoryNode<PublicCategory>[],
+  categoryBookmarks: Map<number, PublicBookmark[]>,
+): HomeSection[] {
+  return categories.map((category) => {
+    const children = (category.children ?? []).map((child) => ({
+      id: `category-${child.id}`,
+      categoryId: child.id,
+      title: child.title,
+      icon: child.icon,
+      count: categoryBookmarks.get(child.id)?.length ?? 0,
+      children: [],
+    }))
+
+    return {
+      id: `category-${category.id}`,
+      categoryId: category.id,
+      title: category.title,
+      icon: category.icon,
+      count: getCategoryTreeBookmarkCount(category, categoryBookmarks),
+      children,
+    }
+  })
 }
 
 export function resolveHomeActiveSectionId(sections: HomeSection[], activeId: string): string {
-  return sections.some((section) => section.id === activeId) ? activeId : sections[0]?.id ?? ''
+  const ids = new Set(sections.flatMap((section) => [section.id, ...section.children.map((child) => child.id)]))
+  return ids.has(activeId) ? activeId : sections[0]?.id ?? ''
 }
 
-export function getNearestIntersectingSectionId(intersectingSectionTops: Map<string, number>): string {
-  let nextActiveId = ''
-  let nearestDistance = Number.POSITIVE_INFINITY
+export function resolveHomeCategorySelection(
+  forest: CategoryNode<PublicCategory>[],
+  activeId: string | number | null | undefined,
+): HomeCategorySelection {
+  const normalizedId = String(activeId ?? '')
 
-  for (const [sectionId, distance] of intersectingSectionTops) {
-    if (distance < nearestDistance) {
-      nearestDistance = distance
-      nextActiveId = sectionId
+  for (const root of forest) {
+    if (`category-${root.id}` === normalizedId || String(root.id) === normalizedId) {
+      return { root, child: null }
+    }
+
+    const child = root.children.find((candidate) => (
+      `category-${candidate.id}` === normalizedId || String(candidate.id) === normalizedId
+    ))
+    if (child) return { root, child }
+  }
+
+  return { root: forest[0] ?? null, child: null }
+}
+
+export function resolveHomeCategoryForRoot(
+  root: CategoryNode<PublicCategory>,
+  activeId: string | number | null | undefined,
+): CategoryNode<PublicCategory> {
+  const normalizedId = String(activeId ?? '')
+  if (normalizedId === String(root.id) || normalizedId === `category-${root.id}`) return root
+
+  return root.children.find((child) => (
+    normalizedId === String(child.id) || normalizedId === `category-${child.id}`
+  )) ?? root
+}
+
+export function getHomeCategoryGroups(
+  forest: CategoryNode<PublicCategory>[],
+  selectedCategoryIds: ReadonlyMap<number, number>,
+): HomeCategoryGroup[] {
+  return forest.map((root) => ({
+    root,
+    selected: resolveHomeCategoryForRoot(root, selectedCategoryIds.get(root.id)),
+  }))
+}
+
+export function resolveActiveHomeRootId(
+  sectionTops: Map<number, number>,
+  threshold: number,
+): number | null {
+  let passedRootId: number | null = null
+  let nearestRootId: number | null = null
+  let passedTop = Number.NEGATIVE_INFINITY
+  let nearestTop = Number.POSITIVE_INFINITY
+
+  for (const [rootId, top] of sectionTops) {
+    if (top <= threshold && top > passedTop) {
+      passedTop = top
+      passedRootId = rootId
+    }
+    if (top < nearestTop) {
+      nearestTop = top
+      nearestRootId = rootId
     }
   }
 
-  return nextActiveId
+  return passedRootId ?? nearestRootId
+}
+
+export function getVisibleCategoryForest(
+  forest: CategoryNode<PublicCategory>[],
+  visibleCategoryIds: Set<number> | null,
+): CategoryNode<PublicCategory>[] {
+  return visibleCategoryIds ? filterCategoryForest(forest, visibleCategoryIds) : forest
 }
 
 export type HomeScrollTargetInput = {
@@ -120,6 +221,8 @@ export function getHomeScrollTarget({
 export function createHomeDataMemo() {
   let sortedCategoriesSource: PublicCategory[] | null = null
   let sortedCategoriesMemo: PublicCategory[] = []
+  let categoryForestSource: PublicCategory[] | null = null
+  let categoryForestMemo: CategoryNode<PublicCategory>[] = []
   let sortedBookmarksSource: PublicBookmark[] | null = null
   let sortedBookmarksMemo: PublicBookmark[] = []
   let categoryTitleSource: PublicCategory[] | null = null
@@ -133,8 +236,16 @@ export function createHomeDataMemo() {
       if (items === sortedCategoriesSource) return sortedCategoriesMemo
 
       sortedCategoriesSource = items
-      sortedCategoriesMemo = [...items].sort((a, b) => a.sort - b.sort)
+      sortedCategoriesMemo = flattenCategoryForest(buildCategoryForest(normalizeCategories(items)))
       return sortedCategoriesMemo
+    },
+
+    getCategoryForest(items: PublicCategory[]): CategoryNode<PublicCategory>[] {
+      if (items === categoryForestSource) return categoryForestMemo
+
+      categoryForestSource = items
+      categoryForestMemo = buildCategoryForest(normalizeCategories(items))
+      return categoryForestMemo
     },
 
     getSortedBookmarks(items: PublicBookmark[]): PublicBookmark[] {
@@ -149,7 +260,7 @@ export function createHomeDataMemo() {
       if (items === categoryTitleSource) return categoryTitleMemo
 
       categoryTitleSource = items
-      categoryTitleMemo = new Map(items.map((category) => [category.id, category.title]))
+      categoryTitleMemo = getCategoryPathMap(items)
       return categoryTitleMemo
     },
 

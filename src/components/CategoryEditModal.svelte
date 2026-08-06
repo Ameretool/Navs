@@ -17,9 +17,12 @@
     type BookmarkIconifySearchState,
   } from '../lib/bookmarkIconifyController'
   import { iconifyIcon, iconifyNameFromUrl } from '../lib/icons'
+  import { buildParentCategoryOptions } from '../lib/categorySelect'
+  import CategoryTreeSelect from './CategoryTreeSelect.svelte'
   import IconifySelector from './IconifySelector.svelte'
 
   const emptyForm: CategoryFormValue = {
+    parent_id: null,
     title: '',
     icon: '',
   }
@@ -32,6 +35,7 @@
   export let onSubmit: ((payload: CategoryFormValue) => void | Promise<void>) | undefined = undefined
   export let onCancel: (() => void) | undefined = undefined
   export let imageHostUrl = ''
+  export let categories: Array<{ id: string | number; parent_id: string | number | null; title: string }> = []
 
   let form: CategoryFormValue = { ...emptyForm }
   let formKey = ''
@@ -49,6 +53,7 @@
     form = {
       ...emptyForm,
       ...(value ?? {}),
+      parent_id: value?.parent_id ?? null,
       title: value?.title ?? '',
       icon: value?.icon ?? '',
     }
@@ -66,6 +71,8 @@
 
   $: iconifyInput = deriveBookmarkIconifyInput(iconifyName)
   $: normalizedIconifyName = iconifyInput.normalizedIconifyName
+  $: categoryHasChildren = form.id != null && categories.some((category) => Number(category.parent_id) === Number(form.id))
+  $: parentCategoryOptions = categoryHasChildren ? [] : buildParentCategoryOptions(categories, form.id)
   $: iconifyPreviewUrl = iconifyInput.iconifyPreviewUrl
   $: iconifySelected = isBookmarkIconifySelected({
     iconifyUseConfirmed,
@@ -206,6 +213,19 @@
           <input bind:value={form.title} type="text" placeholder="例如：常用工具" required />
         </label>
 
+        <div class="field-label">
+          <span>上级分类</span>
+          <CategoryTreeSelect
+            bind:value={form.parent_id}
+            items={parentCategoryOptions}
+            rootOptionLabel="无上级分类"
+            disabled={loading || categoryHasChildren}
+            ariaLabel="选择上级分类"
+            testId="category-parent-tree-select"
+          />
+          {#if categoryHasChildren}<small>该分类包含子分类，需先移动或删除子分类后才能设置上级分类。</small>{/if}
+        </div>
+
         <label>
           <span>图标</span>
           <div class="icon-row">
@@ -318,8 +338,16 @@
     font-size: 14px;
   }
 
+  .field-label {
+    display: grid;
+    gap: 8px;
+    color: #334155;
+    font-size: 14px;
+  }
+
   input {
     width: 100%;
+    min-height: 42px;
     box-sizing: border-box;
     border: 1px solid #cbd5e1;
     border-radius: 12px;

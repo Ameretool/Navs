@@ -32,9 +32,6 @@
     : 'https://img.example.com/dark-bg.png'
   $: imageInputLabel = isLight ? '浅色背景图片地址' : '深色背景图片地址'
   $: gradientDefaults = isLight ? defaultLightGradient : defaultDarkGradient
-  $: gradientPlaceholder = isLight
-    ? 'linear-gradient(135deg, #e0f2fe, #f8fafc)'
-    : 'linear-gradient(135deg, #1e3a8a, #0f172a)'
   $: defaults = isLight
     ? {
         color: defaultLightBackground.value,
@@ -52,8 +49,7 @@
     dispatch('change', { ...background })
   }
 
-  function updateBackgroundType(event: Event): void {
-    const nextType = (event.currentTarget as HTMLSelectElement).value as BackgroundSetting['type']
+  function updateBackgroundType(nextType: BackgroundSetting['type']): void {
     background = {
       ...background,
       type: nextType,
@@ -71,15 +67,24 @@
 
   <div class="background-form">
     <div class="background-main-row">
-      <label class="field background-type-field">
+      <div class="field background-type-field">
         <span>背景类型</span>
-        <select class="native-select" value={background.type} on:change={updateBackgroundType}>
+        <div class="background-type-options" role="radiogroup" aria-label={`${title}背景类型`}>
           {#each backgroundTypeOptions as option}
-            <option value={option.value}>{option.label}</option>
+            <label class:active={background.type === option.value} title={option.hint}>
+              <input
+                type="radio"
+                name={`${theme}-background-type`}
+                value={option.value}
+                checked={background.type === option.value}
+                on:change={() => updateBackgroundType(option.value)}
+              />
+              <span>{option.label}</span>
+            </label>
           {/each}
-        </select>
+        </div>
         <small class="background-type-hint">{hint}</small>
-      </label>
+      </div>
 
       <div class="field background-value-field">
         <span>背景值</span>
@@ -98,10 +103,8 @@
             on:change={() => void syncBackground()}
             defaultStart={gradientDefaults.start}
             defaultEnd={gradientDefaults.end}
-            startLabel={`${title}起始颜色`}
-            endLabel={`${title}结束颜色`}
-            manualLabel={`${title}完整渐变值`}
-            gradientPlaceholder={gradientPlaceholder}
+            startLabel="起始颜色"
+            endLabel="结束颜色"
           />
         {:else}
           <div class="inline-input">
@@ -122,7 +125,7 @@
         {#if background.type === 'color'}
           <small>支持 #hex、rgb() 和 rgba()，也可点击色块选择颜色。</small>
         {:else if background.type === 'gradient'}
-          <small>可用颜色选择器生成两色渐变，也可手动填写完整 CSS 渐变。</small>
+          <small>使用两端颜色生成 CSS 渐变。</small>
         {:else}
           {#if uploadHost}
             <small>填写图片外链 URL，或打开已配置图床上传。</small>
@@ -133,6 +136,20 @@
         {#if !valid}
           <small class="warn">请填写{isLight ? '浅色' : '深色'}模式背景值。</small>
         {/if}
+      </div>
+
+      <div class="field background-mask-field">
+        <span>遮罩颜色</span>
+        <ColorAlphaInput
+          bind:value={background.maskColor}
+          bind:alpha={background.mask}
+          on:change={() => void syncBackground()}
+          placeholder={isLight ? '#ffffff' : '#000000'}
+          inputLabel={`${title}遮罩颜色值`}
+          swatchTitle={`选择${title}遮罩颜色`}
+          alphaText={`${title}遮罩透明度`}
+        />
+        <small>{isLight ? '浅色模式通常使用白色或浅灰。' : '深色模式通常使用黑色或深蓝。'}</small>
       </div>
     </div>
 
@@ -148,20 +165,6 @@
         <input bind:value={background.mask} type="range" min="0" max="1" step="0.05" on:input={() => void syncBackground()} />
         <small>叠加在背景上的遮罩，数值越大背景越淡。</small>
       </label>
-
-      <div class="field background-mask-field">
-        <span>遮罩颜色</span>
-        <ColorAlphaInput
-          bind:value={background.maskColor}
-          bind:alpha={background.mask}
-          on:change={() => void syncBackground()}
-          placeholder={isLight ? '#ffffff' : '#000000'}
-          inputLabel={`${title}遮罩颜色值`}
-          swatchTitle={`选择${title}遮罩颜色`}
-          alphaText={`${title}遮罩透明度`}
-        />
-        <small>{isLight ? '浅色常用白色或浅灰。' : '深色常用黑色或深蓝。'}</small>
-      </div>
     </div>
   </div>
 </section>
@@ -200,14 +203,23 @@
 
   .background-form {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     gap: 10px;
     min-width: 0;
   }
 
-  .background-main-row,
+  .background-main-row {
+    display: grid;
+    grid-template-columns: minmax(120px, 0.55fr) minmax(220px, 1.45fr) minmax(190px, 1fr);
+    gap: 10px;
+    min-width: 0;
+    align-items: start;
+  }
+
   .background-range-grid {
-    display: contents;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    min-width: 0;
   }
 
   .field {
@@ -221,19 +233,7 @@
     align-content: start;
   }
 
-  .background-type-field,
-  .background-range-grid > .field {
-    order: 1;
-  }
-
   .background-value-field {
-    grid-column: 1 / -1;
-    order: 2;
-    padding-top: 2px;
-  }
-
-  .background-type-field select {
-    width: 100%;
     min-width: 0;
   }
 
@@ -242,6 +242,55 @@
     min-width: 0;
     font-size: 12px;
     line-height: 1.35;
+  }
+
+  .background-type-options {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+    border: 1px solid var(--sp-input-border);
+    border-radius: 10px;
+    padding: 3px;
+    background: var(--sp-input-bg);
+  }
+
+  .background-type-options label {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    min-height: 32px;
+    border-radius: 7px;
+    color: var(--sp-muted);
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 160ms ease, color 160ms ease;
+  }
+
+  .background-type-options label.active {
+    background: var(--sp-chip-bg);
+    color: var(--sp-chip-text);
+    font-weight: 650;
+  }
+
+  .background-type-options label span {
+    color: inherit;
+    font-size: 12px;
+    font-weight: inherit;
+  }
+
+  .background-type-options input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .background-type-options label:focus-within {
+    outline: 2px solid var(--sp-accent);
+    outline-offset: 1px;
   }
 
   .background-mask-field {
@@ -278,8 +327,7 @@
     color: var(--sp-warn);
   }
 
-  input:not([type='radio']):not([type='checkbox']),
-  select {
+  input:not([type='radio']):not([type='checkbox']) {
     --select-hover-border: var(--sp-input-hover-border);
     width: 100%;
     box-sizing: border-box;
@@ -301,8 +349,7 @@
     accent-color: var(--sp-accent);
   }
 
-  input:focus,
-  select:focus {
+  input:focus {
     outline: none;
     border-color: var(--sp-accent);
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
@@ -342,21 +389,37 @@
   }
 
   .ghost-button:disabled,
-  input:disabled,
-  select:disabled {
+  input:disabled {
     cursor: not-allowed;
     opacity: 0.6;
   }
 
   @media (max-width: 720px) {
-    .background-form {
+    .background-main-row,
+    .background-range-grid {
       grid-template-columns: 1fr;
     }
 
     .background-type-field,
-    .background-type-field select {
+    .background-type-options {
       width: 100%;
       min-width: 0;
+    }
+
+    .background-value-field .inline-input {
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    .background-value-field .ghost-button {
+      width: 100%;
+    }
+  }
+
+  @container settings-editor (max-width: 660px) {
+    .background-main-row,
+    .background-range-grid {
+      grid-template-columns: 1fr;
     }
 
     .background-value-field .inline-input {

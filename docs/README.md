@@ -15,6 +15,7 @@
 - [项目概览](reference/PROJECT_OVERVIEW.md)
 - [API 契约](reference/API_CONTRACT.md)
 - [技术说明](reference/TECHNICAL_NOTES.md)
+- [分类层级设计](reference/CATEGORY_HIERARCHY_DESIGN.md)
 - [性能契约](reference/PERFORMANCE_CONTRACT.md)
 - [性能测试](reference/PERFORMANCE_TESTING.md)
 
@@ -23,6 +24,8 @@
 - `screenshots/`：README 当前使用的产品截图。
 
 本地历史记录、草稿和浏览器验证资料应放在已忽略的 `docs/history/`、`docs/local/`、`docs/drafts/` 或根目录 `_archive/`，不会进入构建、部署或 Git 提交。
+
+`PROJECT_OVERVIEW.md` 中的维护待办只记录当前源码能够确认的未完成事项；已完成阶段计划和没有产品契约的设想不继续作为当前路线图维护。
 
 ## 项目目录
 

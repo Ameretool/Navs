@@ -47,6 +47,7 @@ node scripts/convert-sunpanel.cjs SunPanel-Data.json cf-navs-import.json
 |---------------|-------------|------|
 | icons[].title | categories.title | 分类名称 |
 | icons[].sort | categories.sort | 分类排序 |
+| - | categories.parent_id | 固定为 `null`，Sun-Panel 分类导入为一级分类 |
 | children[].title | bookmarks.title | 书签标题 |
 | children[].url | bookmarks.url | 书签URL |
 | children[].description | bookmarks.description | 书签描述 |
@@ -62,7 +63,7 @@ node scripts/convert-sunpanel.cjs SunPanel-Data.json cf-navs-import.json
    - Iconify 图标：识别 `mdi:home`、`simple-icons:github`、`iconify:`、`@iconify-json/*`、`@iconify-icons/*` 和 `icon-sets.iconify.design/...`，保存为标准 Iconify URL；后台预览通过 `/api/iconify/*` 代理缓存加载，首页展示优先复用浏览器本地缓存
    - 非图片图标：无法识别为 Iconify 时，导入后按现有图标候选逻辑处理
 
-   运行时普通书签图标会优先读取聚合数据中的 `icon_blob`，没有内嵌图标时才读取浏览器本地图标缓存；缓存缺失时首页会回退使用已保存的普通 HTTP(S) 图标 URL。编辑弹窗打开后会在后台调用短超时刷新接口更新本地图标缓存，保存书签后也会显式刷新。分类图标会通过 `/api/category-icon/:id` 代理读取；Iconify 图标在后台预览走 `/api/iconify/*`，首页展示优先复用浏览器本地缓存，非 URL 的自定义文字或表情图标会直接按文本渲染。
+   运行时普通书签图标会优先读取聚合数据中的 `icon_blob`，没有内嵌图标时才读取浏览器本地图标缓存；缓存缺失时首页会回退使用已保存的普通 HTTP(S) 图标 URL。编辑弹窗打开后会在后台调用短超时刷新接口更新本地图标缓存，保存书签后也会显式刷新。HTTP(S) 分类图片通过 `/api/category-icon/:id` 代理读取，data URI、文字和表情分类图标直接渲染；一级标题、二级标签、搜索分组和折叠导航复用相同展示规则。Iconify 书签图标在后台预览走 `/api/iconify/*`，首页展示优先复用浏览器 HTTP 缓存。
 
 2. **打开方式**：
    - Sun-Panel 的 `2`（新窗口）→ CF-Navs 的 `1`
@@ -76,7 +77,7 @@ node scripts/convert-sunpanel.cjs SunPanel-Data.json cf-navs-import.json
 2. 点击右上角 **⚙️** 图标
 3. 输入管理员凭据登录
 
-### 步骤 2：进入数据管理
+### 步骤 2：进入数据备份与导入
 
 1. 在侧边栏点击 **数据备份与导入**
 2. 找到"导入 / 导出"区域
@@ -112,15 +113,15 @@ node scripts/convert-sunpanel.cjs SunPanel-Data.json cf-navs-import.json
 
 ### 2. 调整分类排序
 
-1. 在后台"分类管理"中
-2. 使用拖拽功能调整分类顺序
-3. 拖拽结束后自动保存
+1. 在后台“分类管理”中进入对应同级分类的排序模式
+2. 拖动分类调整顺序
+3. 点击“保存排序”提交，或点击“取消”放弃本次调整
 
 ### 3. 调整书签排序
 
-1. 展开某个分类
-2. 拖拽书签调整顺序
-3. 自动保存
+1. 在首页找到目标一级分组，切换到“本分类”或对应二级标签后点击“排序”
+2. 拖动书签调整顺序
+3. 点击“保存排序”提交，或点击“取消”放弃本次调整
 
 ### 4. 修改站点设置
 

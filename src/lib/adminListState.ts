@@ -1,4 +1,5 @@
 import type { AdminBookmarkSummary, AdminCategorySummary } from './appData'
+import { buildCategoryTreeOptions, type CategoryTreeOption } from './categorySelect'
 import { DEFAULT_PAGE_SIZE, clampPage, pageCount, pageEnd, pageStart, slicePage } from './pagination'
 import { reorderByIds } from './reorder'
 
@@ -20,7 +21,15 @@ export function getAdminCategoryTitle(
   categoryId: string | number,
   fallback = '未分类',
 ): string {
-  return categories.find((category) => category.id === categoryId)?.title ?? fallback
+  return getAdminCategoryPathMap(categories).get(categoryId) ?? fallback
+}
+
+export function getAdminCategoryPathMap(categories: AdminCategorySummary[]): Map<string | number, string> {
+  const byId = new Map(categories.map((category) => [Number(category.id), category]))
+  return new Map(categories.map((category) => {
+    const parent = category.parent_id == null ? null : byId.get(Number(category.parent_id))
+    return [category.id, parent ? `${parent.title} / ${category.title}` : category.title]
+  }))
 }
 
 export function getAdminCategoryBookmarkCount(
@@ -38,7 +47,9 @@ export function filterAdminBookmarks(
   const normalizedSearch = search.trim().toLowerCase()
   if (!normalizedSearch) return bookmarks
 
-  const categoryTitleById = new Map(categories.map((category) => [category.id, category.title.toLowerCase()]))
+  const categoryTitleById = new Map(
+    [...getAdminCategoryPathMap(categories)].map(([id, path]) => [id, path.toLowerCase()]),
+  )
 
   return bookmarks.filter((bookmark) => {
     const categoryTitle = categoryTitleById.get(bookmark.category_id) ?? ''
@@ -57,6 +68,59 @@ export function filterAdminCategories(
   const normalizedSearch = search.trim().toLowerCase()
   if (!normalizedSearch) return categories
   return categories.filter((category) => category.title.toLowerCase().includes(normalizedSearch))
+}
+
+export type AdminCategoryGroup = {
+  root: AdminCategorySummary
+  children: AdminCategorySummary[]
+}
+
+function compareAdminCategories(a: AdminCategorySummary, b: AdminCategorySummary): number {
+  return Number(a.sort ?? 0) - Number(b.sort ?? 0) || Number(a.id) - Number(b.id)
+}
+
+export function buildAdminCategoryGroups(categories: AdminCategorySummary[]): AdminCategoryGroup[] {
+  const roots = categories
+    .filter((category) => category.parent_id == null)
+    .sort(compareAdminCategories)
+  const childrenByParent = new Map<number, AdminCategorySummary[]>()
+
+  for (const category of categories) {
+    if (category.parent_id == null) continue
+    const parentId = Number(category.parent_id)
+    const children = childrenByParent.get(parentId) ?? []
+    children.push(category)
+    childrenByParent.set(parentId, children)
+  }
+
+  return roots.map((root) => ({
+    root,
+    children: (childrenByParent.get(Number(root.id)) ?? []).sort(compareAdminCategories),
+  }))
+}
+
+export function filterAdminCategoryGroups(
+  groups: AdminCategoryGroup[],
+  search: string,
+): AdminCategoryGroup[] {
+  const normalizedSearch = search.trim().toLowerCase()
+  if (!normalizedSearch) return groups
+
+  return groups.flatMap((group) => {
+    if (group.root.title.toLowerCase().includes(normalizedSearch)) return [group]
+    const children = group.children.filter((child) => child.title.toLowerCase().includes(normalizedSearch))
+    return children.length > 0 ? [{ root: group.root, children }] : []
+  })
+}
+
+export function flattenAdminCategoryGroups(groups: AdminCategoryGroup[]): AdminCategorySummary[] {
+  return groups.flatMap((group) => [group.root, ...group.children])
+}
+
+export function getAdminBookmarkCategoryOptions(
+  categories: AdminCategorySummary[],
+): CategoryTreeOption[] {
+  return buildCategoryTreeOptions(categories)
 }
 
 export function createAdminListPage<T>(

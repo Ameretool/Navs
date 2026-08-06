@@ -54,8 +54,15 @@
   } from './lib/appInstall'
   import { buildOrderedBookmarkIdsForCategory } from './lib/appLocalData'
   import { createBookmarkDraft, createCategoryDraft, findBookmarkForEdit } from './lib/appModalState'
-  import { canSeeHomeView, createHomeGateState, shouldOpenLoginGate, type AppView } from './lib/appNavigation'
+  import {
+    canSeeHomeView,
+    createHomeGateState,
+    shouldOpenLoginGate,
+    shouldRevealHomeFromLocalSnapshot,
+    type AppView,
+  } from './lib/appNavigation'
   import { createOptimisticSortState, runOptimisticSort } from './lib/appSortQueue'
+  import { getAdminBookmarkCategoryOptions } from './lib/adminListState'
   import { getNextThemePreference, resolveAppThemeState } from './lib/appThemeState'
   import type { ImportSource } from './lib/importData'
   import { pruneBookmarkIconCacheStorageBackedByLocalStorage } from './lib/localBookmarkIconCache'
@@ -140,7 +147,7 @@
   let bookmarkError = ''
   let settingsError = ''
 
-  const importExportState = createImportExportState()
+  let importExportState = createImportExportState()
   let preferredThemeMode: ThemeMode | null = null
   let prefersReducedMotion = false
   const categorySortState = createOptimisticSortState()
@@ -421,17 +428,19 @@
   }
 
   function revealHomeFromCurrentData(): void {
-    if (!booting) return
-
     const homeGate = createHomeGateState({
       publicMode: get(configStore).data?.public_mode,
       authenticated: isLoggedIn(),
     })
-    if (homeGate.view === 'home') {
-      loginModalOpen = false
-      currentView = 'home'
-      booting = false
-    }
+    if (!shouldRevealHomeFromLocalSnapshot({
+      booting,
+      adminPath: isAdminPath(),
+      homeView: homeGate.view,
+    })) return
+
+    loginModalOpen = false
+    currentView = 'home'
+    booting = false
   }
 
   function resetCategoryState(): void {
@@ -595,14 +604,20 @@
   }
 
   async function handleDeleteCategory(category: { id: string | number; title: string }): Promise<void> {
-    const confirmed = await requestConfirmation(createDeleteCategoryConfirmation(category.title))
+    const categoryId = Number(category.id)
+    const directBookmarkCount = adminData.bookmarks.filter((bookmark) => bookmark.category_id === categoryId).length
+    const childCategoryCount = adminData.categories.filter((item) => item.parent_id === categoryId).length
+    const confirmed = await requestConfirmation(createDeleteCategoryConfirmation(
+      category.title,
+      directBookmarkCount,
+      childCategoryCount,
+    ))
     if (!confirmed) return
 
     deletingCategoryId = Number(category.id)
     categoryError = ''
 
     try {
-     const categoryId = Number(category.id)
      await api.categories.remove(categoryId)
      await applyLocalCategoryDelete(categoryId)
       await refreshAdminDataAfterMutation()
@@ -723,7 +738,10 @@
   async function handleBatchDeleteCategories(ids: number[]): Promise<void> {
     if (ids.length === 0) return
     const bookmarkCount = adminData.bookmarks.filter((bookmark) => ids.includes(bookmark.category_id)).length
-    if (!await requestConfirmation(createBatchDeleteConfirmation('category', ids.length, bookmarkCount))) return
+    const childCategoryCount = adminData.categories.filter((category) => (
+      category.parent_id != null && ids.includes(category.parent_id)
+    )).length
+    if (!await requestConfirmation(createBatchDeleteConfirmation('category', ids.length, bookmarkCount, childCategoryCount))) return
     try {
       const result = await api.categories.batchDelete(ids)
       if (result.deleted > 0 || result.deleted_bookmarks > 0) await refreshAdminDataAfterMutation()
@@ -764,12 +782,12 @@
     currentView = 'login'
   }
 
-  async function handleSortCategories(ids: Array<string | number>): Promise<void> {
+  async function handleSortCategories(parentId: number | null, ids: Array<string | number>): Promise<void> {
     categoryError = ''
 
     await runOptimisticSort(categorySortState, ids, {
-      applyLocalSort: (sortedIds) => applyLocalCategorySort(sortedIds, false),
-      saveRemoteSort: (sortedIds) => api.categories.sort(sortedIds),
+      applyLocalSort: (sortedIds) => applyLocalCategorySort(parentId, sortedIds, false),
+      saveRemoteSort: (sortedIds) => api.categories.sort(parentId, sortedIds),
       persist: persistCurrentAdminData,
       onSuccess: refreshAdminDataAfterMutation,
       restoreOnError: () => refreshLoggedInData(true),
@@ -805,7 +823,9 @@
   }
 
   function handleExportData(): void {
-    exportDataToFile(importExportState, adminData)
+    exportDataToFile(importExportState, adminData, (next) => {
+      importExportState = next
+    })
   }
 
   async function handleImportData(file: File, source: ImportSource, mode: 'replace' | 'merge'): Promise<void> {
@@ -814,6 +834,9 @@
       requestConfirmation,
       applyLoggedInData: (data) => applyLoggedInData(data),
       persistCurrentAdminData,
+      onStateChange: (next) => {
+        importExportState = next
+      },
     })
     if (!importExportState.backupError && importExportState.backupMessage) {
       await refreshAdminDataAfterMutation()
@@ -998,7 +1021,7 @@
         error={bookmarkError}
         mode={bookmarkModalMode}
         value={activeBookmark}
-        categories={adminCategories.map((category) => ({ id: category.id, title: category.title }))}
+        categories={getAdminBookmarkCategoryOptions(adminCategories)}
         onSubmit={handleSubmitBookmark}
         onCancel={handleCloseBookmarkModal}
         onDelete={handleDeleteBookmark}
@@ -1015,6 +1038,7 @@
       confirmLabel={confirmDialog?.confirmLabel ?? '确认'}
       cancelLabel={confirmDialog?.cancelLabel ?? '取消'}
       variant={confirmDialog?.variant ?? 'default'}
+      confirmDisabled={confirmDialog?.confirmDisabled ?? false}
       onConfirm={handleConfirmDialogConfirm}
       onCancel={handleConfirmDialogCancel}
     />

@@ -18,7 +18,7 @@
   import AdminTabContent from '../components/admin/AdminTabContent.svelte'
   import type { ImportSource } from '../lib/importData'
   import type { SettingsFormValue } from '../lib/appData'
-  import type { AdminTab } from '../lib/adminTypes'
+  import type { AdminTab, CategorySortHandler } from '../lib/adminTypes'
   import type { SortHandler } from '../lib/sortableList'
 
   type AsyncVoid<T = void> = T | Promise<T>
@@ -91,7 +91,7 @@
   export let onBatchDeleteBookmarks: ((ids: number[]) => AsyncVoid) | undefined = undefined
   export let onSubmitSettings: ((payload: SettingsFormValue) => AsyncVoid) | undefined = undefined
   export let onChangePassword: ((payload: ChangePasswordReq) => AsyncVoid) | undefined = undefined
-  export let onSortCategories: SortHandler | undefined = undefined
+  export let onSortCategories: CategorySortHandler | undefined = undefined
   export let onSortBookmarks: SortHandler | undefined = undefined
 
   export let importing = false
@@ -178,6 +178,7 @@
     error={categoryError}
     mode={categoryModalMode}
     value={activeCategory}
+    {categories}
     onSubmit={onSubmitCategory}
     onCancel={onCloseCategoryModal}
     imageHostUrl={imageHostUrl}
@@ -322,5 +323,20 @@
       gap: 16px;
     }
 
+  }
+
+  @media (max-width: 720px) {
+    .admin-page {
+      height: auto;
+      min-height: 100dvh;
+      padding: 12px;
+      overflow: visible;
+    }
+
+    .admin-layout {
+      flex-direction: column;
+      align-items: stretch;
+      overflow: visible;
+    }
   }
 </style>

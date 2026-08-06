@@ -7,8 +7,10 @@ export { toPublicSettings } from '../../shared/settings'
 
 export type AdminCategorySummary = {
   id: string | number
+  parent_id: string | number | null
   title: string
   icon?: string
+  sort?: number
   bookmarkCount?: number
 }
 
@@ -43,8 +45,10 @@ export function toAdminCategories(categories: Category[], bookmarks: Bookmark[])
 
   return categories.map((category) => ({
     id: category.id,
+    parent_id: category.parent_id ?? null,
     title: category.title,
     icon: category.icon ?? '',
+    sort: category.sort,
     bookmarkCount: bookmarkCountByCategory.get(category.id) ?? 0,
   }))
 }

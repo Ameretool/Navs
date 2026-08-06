@@ -62,9 +62,11 @@
 | PUT | `/api/categories/:id` | `CategoryUpsertReq` | `Category` |
 | DELETE | `/api/categories/:id` | 无 | `null` |
 | POST | `/api/categories/batch-delete` | `{ ids: number[] }` | `{ deleted: number, deleted_bookmarks: number }` |
-| POST | `/api/categories/sort` | `SortReq` | `null` |
+| POST | `/api/categories/sort` | `CategorySortReq` | `null` |
 
-删除分类会显式删除该分类下的书签。
+`Category`、公开分类和 `CategoryUpsertReq` 均包含 `parent_id: number | null`。`null` 表示一级分类，非空值必须指向现有一级分类；服务端拒绝自身父级、三级结构，以及把仍有子分类的一级分类移动到其他父级。旧客户端更新请求缺少 `parent_id` 时保留当前父级，新建请求缺少该字段时创建为一级分类。
+
+`CategorySortReq` 为 `{ parent_id: number | null, ids: number[] }`。`ids` 必须与该父级作用域下的完整兄弟集合完全一致，服务端拒绝重复、缺失、跨父级或额外 ID。分类存在子分类时，单个删除和包含该分类的批量删除均返回冲突错误且不写入任何删除；无子分类时仅删除该分类及其直属书签。
 
 ## 书签接口
 
@@ -102,7 +104,7 @@
 - `iconify`：使用 Iconify SVG API，保存格式为 `https://api.iconify.design/{set}/{name}.svg`，例如 `mdi:home` 或 `https://icon-sets.iconify.design/mdi/home/` 会转换为 `https://api.iconify.design/mdi/home.svg`；新增/编辑弹窗会展示 Iconify 候选，候选、手动输入预览和 icon-sets 页面链接都通过 `/api/iconify/{set}/{name}.svg` 代理加载。
 - `custom`：手动填写 URL、表情、纯文字或图床地址。非 URL / 非 data URI 的值会在首页按文本图标直接渲染。
 
-创建或更新书签后，前端会对普通 HTTP(S) 图标显式调用刷新接口，尽量缓存到 `bookmarks.icon_blob`；Iconify 图标和 icon-sets 页面链接不写入 `icon_blob`，后台预览由 `/api/iconify/:set/:name.svg`、Cloudflare edge cache 和同源 Service Worker 缓存复用。更新书签但图标地址或图标来源未改变时不会清空已有 `icon_blob`。首页卡片普通渲染时优先读取聚合数据里的 `icon_blob`，没有内嵌图标时才读取浏览器本地图标缓存；两者都缺失时，可回退使用已保存的普通 HTTP(S) 图标 URL，避免 favicon.im 等可浏览器直连的图标保存后退成文字。普通渲染不主动把 `/api/icon/:id` 挂载到首页 `<img>` 上；只有编辑/保存等显式刷新动作会调用刷新接口。分类图标默认使用 `/api/category-icon/:id?v=...`，已保存的 Iconify 书签图标首页可直接使用标准 Iconify SVG URL，并依赖浏览器 HTTP 缓存复用；后台预览仍使用稳定的 `/api/iconify/:set/:name.svg`。
+创建或更新书签后，前端会对普通 HTTP(S) 图标显式调用刷新接口，尽量缓存到 `bookmarks.icon_blob`；Iconify 图标和 icon-sets 页面链接不写入 `icon_blob`，后台预览由 `/api/iconify/:set/:name.svg`、Cloudflare edge cache 和同源 Service Worker 缓存复用。更新书签但图标地址或图标来源未改变时不会清空已有 `icon_blob`。首页卡片普通渲染时优先读取聚合数据里的 `icon_blob`，没有内嵌图标时才读取浏览器本地图标缓存；两者都缺失时，可回退使用已保存的普通 HTTP(S) 图标 URL，避免 favicon.im 等可浏览器直连的图标保存后退成文字。普通渲染不主动把 `/api/icon/:id` 挂载到首页 `<img>` 上；只有编辑/保存等显式刷新动作会调用刷新接口。HTTP(S) 分类图片使用 `/api/category-icon/:id?v=...`，data URI、文字和表情分类图标直接渲染；一级标题、二级标签、搜索分组和折叠导航复用相同解析与图片失败回退规则。已保存的 Iconify 书签图标首页可直接使用标准 Iconify SVG URL，并依赖浏览器 HTTP 缓存复用；后台预览仍使用稳定的 `/api/iconify/:set/:name.svg`。
 
 前端普通渲染普通 HTTP(S) 书签图标时应先读取聚合数据中的 `icon_blob`，没有内嵌图标时再读取浏览器本地图标缓存，缓存缺失时可使用保存的原始 HTTP(S) 图标 URL 兜底；不要直接把 `/api/icon/:id` 挂载到首页 `<img>`，后台列表仍可把 `/api/icon/:id` 作为兼容预览入口。`/api/icon/:id` 主要作为兼容兜底代理和旧缓存入口保留。持久化的 Iconify 图标首页可使用标准 `https://api.iconify.design/*.svg`，由浏览器 HTTP 缓存复用，避免每个 Iconify 书签都消耗 Worker 请求；后台预览和新增/编辑弹窗仍可规范化为 `/api/iconify/*`。图标缺失、非 HTTP(S) 值或缓存损坏时，代理返回 `no-store` 临时 SVG fallback，不写入长期缓存。Service Worker 对 `/api/icon/*`、`/api/category-icon/*`、`/api/iconify/*` 使用 cache-first 策略，但不会缓存带 `X-Icon-Fallback: 1` 的临时 fallback；对跨域 `https://api.iconify.design/*.svg` 不缓存 `opaque` 响应，并跳过超过 512KB 的图标响应，避免 Cache Storage 膨胀。同一个 Iconify 图标应共享稳定缓存键，不按书签 ID 重复缓存。
 
@@ -112,7 +114,7 @@ HTTP(S) 图标抓取成功后，代理会直接返回图片字节并写入 Cloud
 
 ## 首页搜索行为
 
-首页搜索框输入关键词时直接筛选当前首页分类与书签区域，不再弹出本地书签下拉选择。匹配字段包括书签标题、URL、描述和分类标题。按 Enter 仍按当前搜索引擎配置跳转外部搜索。
+首页搜索框输入关键词时直接切换到全站分组搜索结果，不再弹出本地书签下拉选择。匹配字段包括书签标题、URL、描述和完整分类路径。搜索父分类名称可命中后代分类书签；结果保留命中子分类的父级，并只渲染存在匹配内容的分支。按 Enter 仍按当前搜索引擎配置跳转外部搜索。
 
 ## 设置接口
 
@@ -145,6 +147,6 @@ HTTP(S) 图标抓取成功后，代理会直接返回图片字节并写入 Cloud
 | --- | --- | --- | --- | --- |
 | POST | `/api/import` | 登录 | `ImportReq` | `ImportResp` |
 
-`ImportReq.mode` 支持 `replace` 和 `merge`。合并模式按去除首尾空格、忽略大小写的分类名复用现有分类，重新分配导入记录 ID，保留重复 URL，并保持当前站点设置不变。
+`ImportReq.mode` 支持 `replace` 和 `merge`。旧备份缺少 `parent_id` 时按一级分类处理。合并模式按去除首尾空格、忽略大小写的完整分类路径复用现有分类，因此不同父分类下允许同名子分类；重复 URL 保留，当前站点设置保持不变。
 
-导入支持覆盖和追加合并两种模式：覆盖模式先清空分类和书签，再按传入数据重建；合并模式复用同名分类并追加书签。设置仅写入受支持的公开配置 key，不触碰管理员账号字段。`ImportResp` 包含导入数量和导入后的 `AdminData`，前端应使用该响应更新本地数据，并在需要时重新确认后台数据。
+导入在写入前验证分类深度、父级引用和书签分类引用。覆盖和合并都会先建立旧分类 ID 到新分类 ID 的映射，按一级分类、二级分类、书签的顺序重建，并同时重写二级分类 `parent_id` 与书签 `category_id`。设置仅在覆盖导入中写入受支持的公开配置 key，不触碰管理员账号字段。`ImportResp` 包含导入数量和导入后的 `AdminData`，前端使用该响应更新本地数据并显式同步导入状态。

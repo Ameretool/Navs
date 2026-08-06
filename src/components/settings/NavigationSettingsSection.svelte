@@ -87,7 +87,7 @@
       </label>
 
       <label class="field field-range">
-        <span>左右边距 <em>{form.content_layout.margin_x}px</em></span>
+        <span>桌面左右边距 <em>{form.content_layout.margin_x}px</em></span>
         <input
           bind:value={form.content_layout.margin_x}
           type="range"
@@ -164,6 +164,17 @@
     .inline-input {
       flex-direction: column;
       align-items: stretch;
+    }
+  }
+
+  @container settings-editor (max-width: 680px) {
+    .navigation-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .field-size,
+    .content-layout-grid .field-range {
+      grid-column: 1 / -1;
     }
   }
 </style>

@@ -43,7 +43,7 @@ This document records the current performance-sensitive behavior that should not
 
 Use `npm run perf:audit` after deployments that affect frontend loading, storage, icon behavior, or admin navigation.
 
-Expected current-shape results for `https://navs.bjlius.com`:
+Expected current-shape results for the deployment configured through the git-ignored `verify.local.json`:
 
 - Home loads 345 bookmark cards across 11 sections.
 - Rapid home search causes no DOM rebuild before the debounce settles.

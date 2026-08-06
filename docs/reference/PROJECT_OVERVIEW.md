@@ -1,24 +1,25 @@
 # CF-Navs 项目概览
 
-## 📊 项目统计
+## 📊 项目定位
 
 - **项目类型**：个人导航面板
 - **技术栈**：Cloudflare Workers + Svelte + D1 + KV
-- **代码规模**：约 8000+ 行
-- **组件数量**：15+ 个 Svelte 组件
-- **API 端点**：22+ 个
-- **开发周期**：2024年6月
+- **运行边界**：单 Worker 承载 API 与静态资源，D1 保存业务数据，KV 保存管理员会话
+- **管理模型**：单管理员、可选公开首页、前后台共享设置与书签数据
+
+代码量、组件数、接口数和测试数会随版本持续变化，不在本说明中维护容易失效的静态统计；以当前源码、`package.json` 脚本和测试输出为准。
 
 ## 🎯 核心功能
 
 ### 用户功能
 - ✅ 响应式导航界面：后台可选择左侧或顶部布局
-- ✅ 分类和书签浏览
+- ✅ 两层分类和书签浏览；首页一级标题后用括号显示总站点数，二级分类标签紧随其后横向切换
+- ✅ 分类自定义图片、data URI、文字和表情图标统一显示在一级标题、二级标签、搜索分组和分类导航中
 - ✅ 左侧导航支持桌面悬停展开或常显、手动收缩偏好记忆；移动端始终使用按钮和抽屉
 - ✅ 顶部导航固定悬浮，受内容区域最大宽度约束；桌面支持箭头和鼠标拖动，移动端支持触摸横向滑动
 - ✅ 首页标题独立展示，支持颜色和文字大小配置
 - ✅ 多搜索引擎快速切换
-- ✅ 首页搜索框直接筛选分类书签区域，匹配标题、URL、描述和分类名称
+- ✅ 首页搜索框按完整分类路径筛选，搜索父级名称可命中后代并保留祖先结构
 - ✅ 两种卡片风格（详情/极简）
 - ✅ 详情卡片描述支持始终显示、悬停提示和隐藏，单个书签可覆盖全局策略
 - ✅ 自定义背景（浅色/深色主题分别配置纯色/渐变/图片），并内置 13 组毛玻璃渐变与 9 组护眼纯色方案；护眼方案使用综合色相更明确的浅色前台背景、同色系卡片和可调透明度
@@ -27,23 +28,23 @@
 - ✅ 主题切换（亮色/暗色/自动 + 前台本地快速切换）
 - ✅ 公开模式（可选）
 - ✅ PWA app shell（生产环境 Service Worker）
-- ✅ 刷新时优先恢复本地聚合快照，后台校验数据版本；弱网时保留首页并提示刷新或检查网络
+- ✅ 刷新时优先恢复本地聚合快照，后台校验数据版本；弱网时保留已有内容。直接刷新 `/admin` 时保持启动加载态，认证和后台分包就绪后直接进入后台，不先渲染首页
 
 ### 管理功能
 - ✅ 单管理员登录系统
-- ✅ 分类 CRUD 操作
+- ✅ 两层分类 CRUD、编辑移动、含子分类删除保护
 - ✅ 书签 CRUD 操作
 - ✅ 前台右键编辑书签，编辑入口以卡片浮层显示
 - ✅ 新增/编辑书签弹窗内部滚动，保存按钮保持可见
-- ✅ 拖拽排序（分类和书签；排序模式显示全量列表，避免跨页排序错乱）
-- ✅ 后台分类和书签列表每页 10 条分页，列表面板按当前页内容收紧高度，减少底部空白
+- ✅ 同级拖拽排序；分类排序请求必须提交指定父级下的完整兄弟集合
+- ✅ 分类列表按每页 10 个一级分类分页，子分类默认折叠并按父级展开；书签列表每页 10 条
 - ✅ 多种方式获取图标（Favicon.im / 完整标题文字图标 / Google / Iconify / 自定义 URL、文字或表情）
 - ✅ 文字图标读取完整标题，长标题最多自动换行 4 行，并支持新增/编辑书签时选择 logo.surf 风格配色
 - ✅ 图标代理缓存与本地缓存优先读取（Worker + D1 + Cloudflare edge cache + 浏览器本地缓存）
 - ✅ 书签列表搜索筛选
 - ✅ 分类和书签跨分页批量选择、批量删除
 - ✅ 后台书签列表按标题、分类、链接域名和打开方式进行不落盘排序
-- ✅ 站点设置管理（基础与标题、外观与卡片、布局与导航、搜索服务、页脚与扩展、账号安全六个二级子菜单）
+- ✅ 站点设置管理（站点信息、外观与卡片、布局与导航、搜索设置、页脚内容、账号安全六个二级子菜单）；标题内容、颜色和字号集中在站点信息，图床服务位于其“外部资源”子区块
 - ✅ 数据导入导出，支持 CF-Navs、SunPanel JSON 和浏览器书签 HTML 的合并或覆盖
 - ✅ 备份恢复功能
 
@@ -53,7 +54,7 @@
 ```
 src/
 ├── views/              # 页面视图
-│   ├── Home.svelte     # 首页数据过滤、滚动定位和分类渲染编排
+│   ├── Home.svelte     # 首页搜索、多分组选择、滚动导航和内容渲染编排
 │   └── Admin.svelte    # 管理界面 tab、弹窗和设置/备份编排
 ├── components/         # 可复用组件
 │   ├── Sidebar.svelte  # 左侧/顶部分类导航及临时交互状态
@@ -65,7 +66,9 @@ src/
 │   ├── BookmarkIconCandidatePicker.svelte # 书签图标候选列表
 │   ├── BookmarkCustomIconField.svelte # 自定义图标输入和预览
 │   ├── CategorySection.svelte   # 分类区块
+│   ├── CategoryIcon.svelte      # 分类图片、文字和表情图标展示
 │   ├── HomeFloatingActions.svelte # 首页右上角浮动操作
+│   ├── HomeCategoryScope.svelte # 一级分类标题和分组内二级分类筛选
 │   ├── HomeHeroSearch.svelte # 首页标题和搜索框
 │   ├── SettingsPanel.svelte # 设置面板
 │   ├── admin/          # 后台列表面板与样式
@@ -76,6 +79,8 @@ src/
 │   ├── icons.ts        # 图标候选辅助（多源候选 + 文字图标配色）
 │   ├── adminDataCache.ts # 登录态后台聚合数据浏览器本地快照
 │   ├── localBookmarkIconCache.ts # 书签图标浏览器本地缓存
+│   ├── categoryIconDisplay.ts # 分类图片、文字与失败回退解析
+│   ├── homeData.ts     # 首页分类分组、选择、搜索与滚动纯逻辑
 │   ├── appNavigation.ts # 首页访问/启动落点判定
 │   ├── appImportExport.ts # 备份导出/导入 controller
 │   ├── appSortQueue.ts # 排序保存队列 + 乐观排序编排
@@ -118,7 +123,7 @@ worker/
 settings (key TEXT PRIMARY KEY, value TEXT)
 
 -- 分类表
-categories (id, title, icon, sort, created_at)
+categories (id, parent_id, title, icon, sort, created_at)
 
 -- 书签表
 bookmarks (id, category_id, title, url, icon, icon_source, icon_blob,
@@ -129,13 +134,13 @@ bookmarks (id, category_id, title, url, icon, icon_source, icon_blob,
 
 ### 前端
 - `svelte`: ^4.2.19
-- `vite`: ^5.4.21
+- `vite`: ^5.4.6
 - `typescript`: ^5.5.4
 - `sortablejs`: ^1.15.3
 
 ### 后端
-- `hono`: ^4.6.3
-- `@cloudflare/workers-types`: ^4.20240909.0
+- `hono`: ^4.12.27
+- `@cloudflare/workers-types`: ^4.20260702.1
 
 ## 🔧 配置说明
 
@@ -188,6 +193,7 @@ SESSION_TTL = "604800"             # 会话有效期（7天）
 - 现代化圆角设计
 - 首页标题置于搜索框上方，管理操作以右上角悬浮图标呈现
 - 首页内容统计与分类站点统计跟随当前主题和自定义文字色自动适配
+- 首页同时展示所有一级分类分组，每组默认只呈现直属书签；一级标题、括号总站点数、二级分类标签和管理员操作保持在同一标题行，标签只替换当前分组内容；主内容不使用折叠和重复分类标题
 - 前台分类快速选择栏复用书签卡片的 `--card-bg-rgb` / `--card-bg-opacity` 玻璃背景变量，PC 折叠栏、展开栏和移动端触发按钮/抽屉保持同一视觉层级
 - 后台管理侧边栏使用独立的 admin surface 变量，随 `data-theme` 切换浅色/深色表面、边框、阴影和 active 状态
 - 毛玻璃方案的书签卡片使用 `backdrop-filter` 透出渐变背景；护眼纯色方案使用同色系浅卡片、主题化阴影和直接受 `card_background_opacity` 控制的透明度，亮暗模式分别提供高对比标题与备注颜色
@@ -197,7 +203,7 @@ SESSION_TTL = "604800"             # 会话有效期（7天）
 
 ### 交互设计
 - 拖拽排序
-- 后台分类和书签列表使用每页 10 条分页，普通模式下面板高度跟随当前页内容收紧；排序模式显示全量列表并保留面板内滚动，避免跨页排序错乱
+- 后台分类列表按每页 10 个一级分类分页并默认折叠子分类，书签列表按每页 10 条分页；普通模式下面板高度跟随当前页内容收紧，排序模式显示对应作用域的全量列表并保留面板内滚动，避免跨页排序错乱
 - 平滑过渡动画
 - 加载状态反馈
 - 错误提示
@@ -224,9 +230,9 @@ SESSION_TTL = "604800"             # 会话有效期（7天）
 - 首页普通书签图标优先读取聚合数据 `icon_blob`，没有内嵌图标时才读取浏览器本地图标缓存；仍缺失时回退已保存的普通 HTTP(S) 图标 URL，不主动挂载 `/api/icon/:id`；编辑弹窗先打开，再后台调用短超时刷新接口更新本地图标缓存，保存书签后也会显式刷新；首页图标接近视口后才设置 `src`，并继续使用原生懒加载与异步解码，降低首屏图标解码和请求压力
 - 前台右上角主题按钮使用浏览器本地偏好快速切换亮暗模式，不触发 Worker 请求；新增/编辑书签弹窗默认收起文字图标配色和 Iconify 输入区，选中对应图标类型后才展开
 - SunPanel 导入会识别 Iconify 图标名和 icon-sets 页面链接，导入后保存为标准 Iconify URL 并标记 `icon_source: iconify`；后台预览走 `/api/iconify/*` 代理，首页展示可直连 `api.iconify.design` 并复用浏览器 HTTP 缓存，避免按书签数量增加 Worker 请求
-- 首页搜索预计算书签索引；滚动高亮缓存分区 DOM 并优先使用 `IntersectionObserver`，分类分区通过 `content-visibility: auto` 降低离屏渲染成本
+- 首页搜索预计算书签索引；普通浏览只挂载各一级分组的直属书签，二级内容按标签切换挂载；搜索结果分组使用 `content-visibility: auto` 降低离屏渲染成本
 - 顶部导航使用 `ResizeObserver` 合并更新溢出状态，箭头按约 70% 可视宽度滚动；左侧常显的手动收缩偏好仅保存在浏览器版本化 `localStorage` 键中
-- 登录态启动会先读取后台聚合本地快照，再用 `/api/data/version` 做远端确认；版本相同时不拉完整数据，版本变化、无快照、后台入口需要完整数据或首页管理操作需要回滚时，才使用 `/api/admin/data` 一次拉取分类、书签和完整设置，并从完整设置派生站点配置
+- 登录态启动会先读取后台聚合本地快照，再用 `/api/data/version` 做远端确认；版本相同时不拉完整数据，版本变化、无快照、后台入口需要完整数据或首页管理操作需要回滚时，才使用 `/api/admin/data` 一次拉取分类、书签和完整设置，并从完整设置派生站点配置。后台直达路径恢复快照时不会提前解除启动遮罩
 - 登录响应携带用户名；登录成功和已有登录态启动都无需先请求 `/api/me`
 - Worker 认证中间件在单个 isolate 内短时复用已验证 session，后台连续操作不必每个请求都读取 KV，登录成功和退出登录会同步更新该内存缓存
 - 前端 API 客户端在内存中复用已解析的有效登录态，认证请求不再反复读取和解析 localStorage，并监听跨标签页 storage 变更
@@ -250,8 +256,8 @@ SESSION_TTL = "604800"             # 会话有效期（7天）
 - `/api/admin/data` 合并后台进入时的数据读取，分类、书签和 settings 使用 D1 batch 读取，并随响应携带当前数据版本；请求带 no-cache 指令时会绕过 Worker isolate 内的短 TTL 运行时聚合缓存
 - `/api/public/data` 确认公开后用一次 D1 batch 合并公开 settings、分类和书签读取，并只读取首页公开字段；书签公开字段保留 `icon_blob` 以支持本地优先图标展示，但不返回 `created_at` 等管理字段；同请求内刚从 D1 读取过的 `site_title/public_mode` 会合并进公开 settings，避免第二次 settings 查询重复读取这两行
 - 后台设置面板提交完整 `Settings` 字段时，`PUT /api/settings` 写入 D1 后直接由提交 payload 合成响应；只有兼容性部分更新请求才写后回读完整 settings
-- 分类和书签新增用单条 `INSERT ... SELECT ... RETURNING` 合并末尾排序计算和返回值，书签新增还会在同一语句中判断分类是否存在；分类和书签更新使用 `UPDATE ... RETURNING` 直接返回更新后的完整行，避免更新前额外读取旧记录；书签更新在 SQL 内只于图标变化时清空 `icon_blob`
-- 分类删除使用删除语句 `changes` 判断是否存在，避免删除前额外读取分类
+- 分类新增用 `INSERT ... SELECT ... RETURNING` 在目标父级作用域计算末尾排序；分类更新先读取当前父级和子分类状态，再用 `UPDATE ... RETURNING` 完成合法移动。书签新增仍在单条语句中判断分类是否存在；书签更新在 SQL 内只于图标变化时清空 `icon_blob`
+- 分类删除先查询子分类数量执行保护，无子分类时再按删除语句 `changes` 判断目标是否存在，并显式删除直属书签
 - 公开聚合、后台聚合、书签列表和图标详情等读取路径跳过预检查式 schema 迁移，仅在旧库缺列错误时迁移并重试一次
 - `/api/icon/:id`、`/api/category-icon/:id` 与 `/api/iconify/:set/:name.svg` 统一提供图标代理能力，普通书签图标 cache miss 时一次 D1 查询同时读取地址和 `icon_blob`，外站抓取成功后直接返回图片字节；首页普通书签卡片优先读取聚合数据中的 `icon_blob`，没有内嵌图标时才读浏览器本地图标缓存，仍缺失时回退保存的 HTTP(S) 图标 URL，避免 favicon.im 等浏览器可直连图标保存后显示文字；首页不把 `/api/icon/:id` 作为普通浏览路径，后台列表仍可使用代理预览；Iconify 图标和 icon-sets 页面链接不写 `icon_blob`，后台预览通过稳定 `/api/iconify/*` 共享 edge cache，首页展示复用浏览器 HTTP 缓存的 Iconify SVG；Service Worker 不缓存跨域 `opaque` 图标响应，后台已有 `icon_blob` 预览不再复制写入本地图标缓存；普通 HTTP(S) 书签图标代理抓取失败时返回错误，图标缺失、非 HTTP(S) 值、分类图标或 Iconify 失败时仍使用短 TTL 临时 SVG fallback
 - 静态资源 CDN
@@ -265,8 +271,8 @@ SESSION_TTL = "604800"             # 会话有效期（7天）
 
 - 密码使用 WebCrypto PBKDF2 哈希存储
 - Session token 随机生成
-- CSRF 防护（SameSite cookie）
-- XSS 防护（内容转义）
+- Bearer Session Token 通过 `Authorization` 请求头发送，不使用 Cookie，因此没有基于 Cookie 的 CSRF 攻击面
+- Session Token 保存在浏览器 `localStorage`；严格 CSP、同源脚本限制和输出转义共同降低 XSS 窃取风险
 - 管理员操作鉴权
 - Secret 管理（Wrangler secrets）
 
@@ -274,7 +280,7 @@ SESSION_TTL = "604800"             # 会话有效期（7天）
 
 ### 代码风格
 - TypeScript 严格模式
-- ESLint + Prettier（推荐）
+- `tsc` 与 `svelte-check` 作为类型和组件诊断基线
 - 组件单一职责
 - 类型安全
 
@@ -285,10 +291,10 @@ SESSION_TTL = "604800"             # 会话有效期（7天）
 
 ### 测试
 - `npm run type-check`：TypeScript 与 Svelte 诊断，要求 0 error / 0 warning
-- `npm test`：Vitest 单元测试，当前 39 套 / 221 tests，覆盖前端 helper、worker 图标逻辑、settings 数据归一化、安全权限、错误监控和排序编排
+- `npm test`：Vitest 单元与源码回归测试，覆盖前端 helper、Worker 逻辑、settings 数据归一化、安全权限、缓存、错误监控和排序编排；具体数量以本次命令输出为准
 - `npm run build`：生产构建验证
 - `git diff --check`：提交前空白检查
-- `npm run regression:chrome`：生产 Chrome 回归，当前 25 项严格检查，覆盖 API smoke、首页、后台、设置/备份、右键编辑、登录退出和安全权限；安全测试中预期的 401 会归入 `network.expectedFailed`
+- `npm run regression:chrome`：生产 Chrome 回归，覆盖 API smoke、首页、后台、设置/备份、右键编辑、登录退出和安全权限；检查数量以脚本当前实现为准，安全测试中预期的 401 会归入 `network.expectedFailed`
 
 ## 🚀 部署流程
 
@@ -315,26 +321,14 @@ docs/
 └── screenshots/        # README 使用的当前界面截图
 ```
 
-## 🎯 未来规划
+## 🎯 维护待办
 
-### 短期计划
-- [x] 完善单元测试（39 套 / 221 tests）
-- [x] Chrome 回归测试（25 项严格检查 + 独立 headless profile）
-- [x] 性能审计脚本（`npm run perf:audit`）
-- [x] 生产错误收集（`errorMonitor.ts` + `/api/error-report`）
-- [ ] 继续按 use-case 收敛 `App.svelte`（auth / CRUD / modal controller）
-- [ ] 后台设置组件继续瘦身，优先抽纯数据转换或重复状态逻辑
+这里只记录已经从当前实现中确认、且尚未完成的维护事项。多语言、多用户、团队协作和数据分析等方向没有当前产品契约，不作为已承诺路线图。
 
-### 中期计划
-- [ ] API 文档自动生成
-- [ ] 多语言支持（i18n）
-- [ ] 长列表规模继续扩大时评估虚拟化
-
-### 长期计划
-- [ ] 多用户支持（可选）
-- [ ] 团队协作功能
-- [ ] 数据分析面板
-- [ ] 第三方集成
+- [ ] 为直接刷新 `/admin` 增加真实 Chrome 回归：确认首页不会短暂挂载，并记录控制台错误、页面异常和失败请求。
+- [ ] 下一次生产发布并完成真实浏览器验证后，更新 `docs/screenshots/cf-navs-admin-setting.jpg`；现有截图只作界面示意，不作为当前字段布局契约。
+- [ ] 后续修改认证、CRUD 或弹窗流程时，继续按 use case 缩小 `App.svelte` 的编排职责；每次拆分必须先接入真实调用链并保留现有缓存、路由和回滚行为。
+- [ ] 只有在接近真实规模的数据证明 DOM 数量或交互耗时成为瓶颈后，才评估长列表虚拟化，并记录改动前后的指标。
 
 ## 🤝 贡献指南
 

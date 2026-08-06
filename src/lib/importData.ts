@@ -1,4 +1,5 @@
 import type { BackupData, Bookmark, Category, ImportReq, Settings } from '../../shared/types'
+import { normalizeCategories } from '../../shared/categoryHierarchy'
 import { iconifyIcon } from './icons'
 
 export type ImportSource = 'cf-navs' | 'sunpanel' | 'browser-html'
@@ -118,7 +119,7 @@ function prepareCFNavsImport(parsed: unknown): PreparedImport {
 
   return {
     payload: {
-      categories: data.categories as Category[],
+      categories: normalizeCategories(data.categories as Category[]),
       bookmarks: data.bookmarks as Bookmark[],
       settings: (data.settings ?? undefined) as Partial<Settings> | undefined,
     },
@@ -149,6 +150,7 @@ function prepareSunPanelImport(parsed: unknown): PreparedImport {
     const categoryId = categoryIndex + 1
     categories.push({
       id: categoryId,
+      parent_id: null,
       title: readString(rawCategory.title, `Category ${categoryId}`).trim() || `Category ${categoryId}`,
       icon: null,
       sort: readNumber(rawCategory.sort, categoryIndex),
@@ -238,7 +240,8 @@ export function prepareBrowserBookmarkHtml(text: string): PreparedImport {
   let skipped = 0
   let retainedIcons = 0
 
-  const categoryByTitle = new Map<string, Category>()
+  const rootByTitle = new Map<string, Category>()
+  const childByPath = new Map<string, Category>()
   const nextSort = new Map<number, number>()
   function decode(value: string): string {
     return value.replace(/&amp;/gi, '&').replace(/&lt;/gi, '<').replace(/&gt;/gi, '>').replace(/&quot;/gi, '"').replace(/&#39;|&apos;/gi, "'").replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
@@ -247,18 +250,53 @@ export function prepareBrowserBookmarkHtml(text: string): PreparedImport {
     const match = tag.match(new RegExp(`\\b${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, 'i'))
     return decode(match?.[1] ?? match?.[2] ?? match?.[3] ?? '')
   }
-  function categoryFor(title: string): Category {
+  function rootCategoryFor(title: string): Category {
     const normalized = title.trim() || '浏览器书签'
-    const existing = categoryByTitle.get(normalized)
+    const key = normalized.toLowerCase()
+    const existing = rootByTitle.get(key)
     if (existing) return existing
-    const category: Category = { id: nextCategoryId++, title: normalized, icon: null, sort: categories.length, created_at: now }
-    categories.push(category); categoryByTitle.set(normalized, category); nextSort.set(category.id, 0)
+    const category: Category = {
+      id: nextCategoryId++,
+      parent_id: null,
+      title: normalized,
+      icon: null,
+      sort: rootByTitle.size,
+      created_at: now,
+    }
+    categories.push(category)
+    rootByTitle.set(key, category)
+    nextSort.set(category.id, 0)
     return category
   }
-  function parseLink(tag: string, title: string, categoryTitle: string) {
+
+  function categoryForPath(path: string[]): Category {
+    if (path.length === 0) return rootCategoryFor('浏览器书签')
+    const root = rootCategoryFor(path[0])
+    if (path.length === 1) return root
+
+    const childTitle = path.slice(1).join(' › ')
+    const key = `${root.id}:${childTitle.toLowerCase()}`
+    const existing = childByPath.get(key)
+    if (existing) return existing
+    const siblingSort = [...childByPath.values()].filter((category) => category.parent_id === root.id).length
+    const category: Category = {
+      id: nextCategoryId++,
+      parent_id: root.id,
+      title: childTitle,
+      icon: null,
+      sort: siblingSort,
+      created_at: now,
+    }
+    categories.push(category)
+    childByPath.set(key, category)
+    nextSort.set(category.id, 0)
+    return category
+  }
+
+  function parseLink(tag: string, title: string, categoryPath: string[]) {
     const url = attribute(tag, 'HREF').trim()
     if (!validBookmarkUrl(url)) { skipped += 1; return }
-    const categoryId = categoryFor(categoryTitle).id
+    const categoryId = categoryForPath(categoryPath).id
     const icon = (attribute(tag, 'ICON') || attribute(tag, 'ICON_URI')).trim() || null
     const safeIcon = icon && (/^https?:\/\//i.test(icon) || (/^data:image\//i.test(icon) && icon.length <= 256 * 1024)) ? icon : null
     if (safeIcon) retainedIcons += 1
@@ -273,6 +311,22 @@ export function prepareBrowserBookmarkHtml(text: string): PreparedImport {
       description: null, description_mode: null,
       open_method: 1, sort, created_at: Number(attribute(tag, 'ADD_DATE')) ? Number(attribute(tag, 'ADD_DATE')) * 1000 : now,
     })
+  }
+
+  function effectiveCategoryPath(categoryPath: string[]): string[] {
+    const first = categoryPath[0]?.trim().toLowerCase() ?? ''
+    const exportContainers = new Set([
+      'bookmarks bar',
+      'bookmarks toolbar',
+      'bookmarks menu',
+      'other bookmarks',
+      'favorites bar',
+      '收藏夹栏',
+      '书签栏',
+      '书签工具栏',
+      '其他书签',
+    ])
+    return exportContainers.has(first) ? categoryPath.slice(1) : categoryPath
   }
 
   const tokens = text.match(/<\/?(?:DL|H3|A|DD|DT)\b[^>]*>|[^<]+/gi) ?? []
@@ -309,9 +363,7 @@ export function prepareBrowserBookmarkHtml(text: string): PreparedImport {
     if (/^<\/A/i.test(token)) {
       captureLink = false
       const categoryPath = dlStack[dlStack.length - 1]?.categoryPath ?? []
-      // 浏览器导出通常会用第一层 H3（如“收藏夹栏”）包住整个目录树；
-      // 该层只是导出容器，不作为业务分类，后续层级整体上移一级。
-      parseLink(linkTag, linkText, categoryPath.slice(1).join(' / ') || '浏览器书签')
+      parseLink(linkTag, linkText, effectiveCategoryPath(categoryPath))
       continue
     }
     if (/^<DD\b/i.test(token)) { captureDescription = true; descriptionText = ''; continue }

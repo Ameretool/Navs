@@ -43,6 +43,19 @@ export function applySortOrder<T extends SortableRow>(items: T[], ids: number[])
     .sort((a, b) => a.sort - b.sort || a.id - b.id)
 }
 
+export function applyCategorySiblingSort<T extends SortableRow & { parent_id: number | null }>(
+  items: T[],
+  parentId: number | null,
+  ids: number[],
+): T[] {
+  const sortById = new Map(ids.map((id, index) => [id, index]))
+  return items.map((item) => (
+    item.parent_id === parentId && sortById.has(item.id)
+      ? { ...item, sort: sortById.get(item.id) ?? item.sort }
+      : item
+  ))
+}
+
 export function upsertPublicBookmark(bookmarks: PublicBookmark[], bookmark: Bookmark): PublicBookmark[] {
   return upsertById(bookmarks, toPublicBookmark(bookmark))
 }
@@ -89,6 +102,7 @@ export function upsertBookmark(bookmarks: Bookmark[], bookmark: Bookmark): Bookm
 export function upsertPublicCategory(categories: PublicCategory[], category: Category): PublicCategory[] {
   return upsertById(categories, {
     id: category.id,
+    parent_id: category.parent_id,
     title: category.title,
     icon: category.icon,
     sort: category.sort,

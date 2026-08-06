@@ -1,13 +1,24 @@
 <script lang="ts">
   import { onDestroy, onMount, tick } from 'svelte'
   import type { NavigationSetting } from '../../shared/types'
+  import CategoryIcon from './CategoryIcon.svelte'
   import {
+    getAnchoredOverlayPosition,
     getHorizontalNavigationMetrics,
     readLeftNavigationCollapsed,
     writeLeftNavigationCollapsed,
   } from '../lib/navigationLayout'
 
-  export let items: Array<{ id: string | number; title: string; count?: number }> = []
+  type NavigationItem = {
+    id: string | number
+    categoryId: number
+    title: string
+    icon: string | null
+    count?: number
+    children?: NavigationItem[]
+  }
+
+  export let items: NavigationItem[] = []
   export let activeId: string | number | null = null
   export let navigation: NavigationSetting = { position: 'left', always_expanded: false }
   export let onNavigate: ((id: string | number) => void) | undefined = undefined
@@ -16,6 +27,7 @@
   const MOBILE_WIDTH = 800
   const DRAG_THRESHOLD_PX = 6
   const RESIZE_DEBOUNCE_MS = 120
+  const TOP_SUBMENU_WIDTH = 220
 
   let isMobileView = false
   let mobileSidebarOpen = false
@@ -37,6 +49,14 @@
   let dragStartX = 0
   let dragStartScrollLeft = 0
   let reportedPersistentExpansion: boolean | null = null
+  let navigationRoot: HTMLElement | null = null
+  let expandedParentIds = new Set<string>()
+  let revealedActiveParentId = ''
+  let openTopMenuId = ''
+  let topMenuStyle = ''
+  let topMenuAnchor: HTMLElement | null = null
+  let topMenuToggle: HTMLButtonElement | null = null
+  let topMenuElement: HTMLElement | null = null
 
   $: isTop = navigation.position === 'top'
   $: isPersistentLeft = !isTop && !isMobileView && navigation.always_expanded
@@ -76,6 +96,17 @@
     void tick().then(() => scrollActiveItemIntoView('smooth'))
   }
 
+  $: activeParentId = items.find((item) => (
+    item.children?.some((child) => String(child.id) === String(activeId))
+  ))?.id
+
+  $: if (isTop || activeParentId == null) revealedActiveParentId = ''
+
+  $: if (!isTop && activeParentId != null && String(activeParentId) !== revealedActiveParentId) {
+    revealedActiveParentId = String(activeParentId)
+    expandedParentIds = new Set([...expandedParentIds, revealedActiveParentId])
+  }
+
   function checkIsMobile(): void {
     isMobileView = window.innerWidth < MOBILE_WIDTH
   }
@@ -89,6 +120,7 @@
       hoverExpanded = false
     }
     updateOverflowState()
+    updateTopMenuPosition()
   }
 
   function scheduleResize(): void {
@@ -140,7 +172,105 @@
     }
 
     onNavigate?.(id)
+    closeTopMenu()
     if (isMobileView && !isTop) mobileSidebarOpen = false
+  }
+
+  function getCategoryIconValue(item: NavigationItem) {
+    return {
+      id: item.categoryId,
+      title: item.title,
+      icon: item.icon ?? null,
+    }
+  }
+
+  function toggleParent(item: NavigationItem, event?: MouseEvent): void {
+    const id = String(item.id)
+    if (isTop) {
+      if (openTopMenuId === id) {
+        closeTopMenu()
+        return
+      }
+      const button = event?.currentTarget as HTMLButtonElement | null
+      topMenuAnchor = button?.closest<HTMLElement>('.top-item-group') ?? button
+      topMenuToggle = button
+      updateTopMenuPosition()
+      openTopMenuId = id
+      if (event?.detail === 0) {
+        void tick().then(() => getTopMenuItems()[0]?.focus())
+      }
+      return
+    }
+
+    const next = new Set(expandedParentIds)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    expandedParentIds = next
+  }
+
+  function closeTopMenu(restoreFocus = false): void {
+    const toggle = topMenuToggle
+    openTopMenuId = ''
+    topMenuAnchor = null
+    topMenuToggle = null
+    topMenuElement = null
+    topMenuStyle = ''
+    if (restoreFocus) void tick().then(() => toggle?.focus())
+  }
+
+  function getTopMenuItems(): HTMLButtonElement[] {
+    if (!topMenuElement) return []
+    return Array.from(topMenuElement.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'))
+  }
+
+  function handleTopMenuKeyDown(event: KeyboardEvent): void {
+    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
+    const menuItems = getTopMenuItems()
+    if (menuItems.length === 0) return
+    event.preventDefault()
+    const currentIndex = menuItems.indexOf(document.activeElement as HTMLButtonElement)
+    const nextIndex = event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? menuItems.length - 1
+        : event.key === 'ArrowUp'
+          ? (currentIndex - 1 + menuItems.length) % menuItems.length
+          : (currentIndex + 1) % menuItems.length
+    menuItems[nextIndex]?.focus()
+  }
+
+  function updateTopMenuPosition(): void {
+    if (!topMenuAnchor || !navigationRoot || !isTop) return
+    const anchorRect = topMenuAnchor.getBoundingClientRect()
+    const navigationRect = navigationRoot.getBoundingClientRect()
+    const position = getAnchoredOverlayPosition({
+      anchorLeft: anchorRect.left,
+      anchorRight: anchorRect.right,
+      anchorBottom: anchorRect.bottom,
+      overlayWidth: TOP_SUBMENU_WIDTH,
+      viewportWidth: window.innerWidth,
+    })
+    topMenuStyle = `top: ${position.top - navigationRect.top - navigationRoot.clientTop}px; left: ${position.left - navigationRect.left - navigationRoot.clientLeft}px;`
+  }
+
+  function handleTopTrackScroll(): void {
+    updateOverflowState()
+    updateTopMenuPosition()
+  }
+
+  function handleDocumentPointerDown(event: PointerEvent): void {
+    if (openTopMenuId && navigationRoot && !navigationRoot.contains(event.target as Node)) {
+      closeTopMenu()
+    }
+  }
+
+  function handleDocumentKeyDown(event: KeyboardEvent): void {
+    if (event.key !== 'Escape') return
+    if (openTopMenuId) {
+      closeTopMenu(true)
+      return
+    }
+    if (mobileSidebarOpen) mobileSidebarOpen = false
   }
 
   function updateOverflowState(): void {
@@ -173,8 +303,9 @@
 
   function scrollActiveItemIntoView(behavior: ScrollBehavior): void {
     if (!topTrack || activeId == null) return
+    const navigationId = activeParentId ?? activeId
     const activeItem = Array.from(topTrack.querySelectorAll<HTMLElement>('[data-navigation-id]'))
-      .find((element) => element.dataset.navigationId === String(activeId))
+      .find((element) => element.dataset.navigationId === String(navigationId))
     if (!activeItem) return
 
     const trackRect = topTrack.getBoundingClientRect()
@@ -237,6 +368,8 @@
     checkIsMobile()
     mounted = true
     window.addEventListener('resize', scheduleResize)
+    document.addEventListener('pointerdown', handleDocumentPointerDown)
+    document.addEventListener('keydown', handleDocumentKeyDown)
 
     if (typeof ResizeObserver !== 'undefined') {
       resizeObserver = new ResizeObserver(scheduleOverflowUpdate)
@@ -253,6 +386,8 @@
   onDestroy(() => {
     mounted = false
     window.removeEventListener('resize', scheduleResize)
+    document.removeEventListener('pointerdown', handleDocumentPointerDown)
+    document.removeEventListener('keydown', handleDocumentKeyDown)
     resizeObserver?.disconnect()
     if (resizeTimer) clearTimeout(resizeTimer)
     if (overflowFrame != null) cancelAnimationFrame(overflowFrame)
@@ -261,7 +396,7 @@
 </script>
 
 {#if isTop}
-  <aside class="top-navigation" data-testid="top-navigation" aria-label="分类导航">
+  <aside class="top-navigation" bind:this={navigationRoot} data-testid="top-navigation" aria-label="分类导航">
     <button
       type="button"
       class="scroll-arrow scroll-arrow-left"
@@ -278,24 +413,40 @@
       class="top-track"
       class:dragging
       bind:this={topTrack}
-      on:scroll={updateOverflowState}
+      on:scroll={handleTopTrackScroll}
       on:pointerdown={handlePointerDown}
       on:pointermove={handlePointerMove}
       on:pointerup={finishPointerDrag}
       on:pointercancel={finishPointerDrag}
     >
       {#each items as item (item.id)}
-        <button
-          type="button"
-          class="top-item"
-          class:active={activeId === item.id}
-          data-navigation-id={item.id}
-          aria-current={activeId === item.id ? 'location' : undefined}
-          on:click={() => handleItemClick(item.id)}
-        >
-          <span>{item.title}</span>
-          {#if item.count != null}<small>{item.count}</small>{/if}
-        </button>
+        <div class="top-item-group" data-navigation-id={item.id}>
+          <button
+            type="button"
+            class="top-item"
+            title={item.title}
+            class:active={String(activeId) === String(item.id) || String(activeParentId) === String(item.id)}
+            aria-current={String(activeId) === String(item.id) ? 'location' : undefined}
+            on:click={() => handleItemClick(item.id)}
+          >
+            {#if item.icon}
+              <CategoryIcon category={getCategoryIconValue(item)} size={22} className="top-category-icon" />
+            {/if}
+            <span>{item.title}</span>
+            {#if item.count != null}<small>{item.count}</small>{/if}
+          </button>
+          {#if item.children?.length}
+            <button
+              type="button"
+              class="top-submenu-toggle"
+              aria-label={`${openTopMenuId === String(item.id) ? '收起' : '展开'} ${item.title} 的子分类`}
+              aria-expanded={openTopMenuId === String(item.id)}
+              on:click={(event) => toggleParent(item, event)}
+            >
+              ▾
+            </button>
+          {/if}
+        </div>
       {/each}
     </nav>
 
@@ -310,6 +461,39 @@
     >
       ›
     </button>
+
+    {#if openTopMenuId}
+      {@const parent = items.find((item) => String(item.id) === openTopMenuId)}
+      {#if parent?.children?.length}
+        <div
+          class="top-submenu"
+          style={topMenuStyle}
+          role="menu"
+          tabindex="-1"
+          aria-label={`${parent.title} 子分类`}
+          bind:this={topMenuElement}
+          on:keydown={handleTopMenuKeyDown}
+        >
+          {#each parent.children as child (child.id)}
+            <button
+              type="button"
+              role="menuitem"
+              title={child.title}
+              class:active={String(activeId) === String(child.id)}
+              on:click={() => handleItemClick(child.id)}
+            >
+              <span class="top-submenu-title">
+                {#if child.icon}
+                  <CategoryIcon category={getCategoryIconValue(child)} size={22} className="top-submenu-icon" />
+                {/if}
+                <span>{child.title}</span>
+              </span>
+              {#if child.count != null}<small>{child.count}</small>{/if}
+            </button>
+          {/each}
+        </div>
+      {/if}
+    {/if}
   </aside>
 {:else}
   <button
@@ -337,6 +521,7 @@
     aria-label="分类导航"
     on:mouseenter={handleMouseEnter}
     on:mouseleave={handleMouseLeave}
+    bind:this={navigationRoot}
   >
     {#if isMobileView}
       <button type="button" class="toc-close-btn" on:click={closeMobileSidebar} aria-label="收起目录">‹</button>
@@ -355,16 +540,61 @@
 
     <nav class="toc-nav">
       {#each items as item (item.id)}
-        <button
-          type="button"
-          class="toc-item"
-          class:active={activeId === item.id}
-          aria-current={activeId === item.id ? 'location' : undefined}
-          on:click={() => handleItemClick(item.id)}
-        >
-          <span class="toc-slip"></span>
-          <span class="toc-title">{item.title}</span>
-        </button>
+        <div class="toc-group">
+          <div class="toc-parent-row">
+            <button
+              type="button"
+              class="toc-item"
+              title={item.title}
+              class:active={String(activeId) === String(item.id)}
+              aria-current={String(activeId) === String(item.id) ? 'location' : undefined}
+              on:click={() => handleItemClick(item.id)}
+            >
+              {#if item.icon}
+                <span class="toc-icon-slot">
+                  <CategoryIcon category={getCategoryIconValue(item)} size={26} className="toc-category-icon" />
+                </span>
+              {:else}
+                <span class="toc-slip"></span>
+              {/if}
+              <span class="toc-title">{item.title}</span>
+              {#if item.count != null}<small>{item.count}</small>{/if}
+            </button>
+            {#if item.children?.length}
+              <button
+                type="button"
+                class="toc-expand-button"
+                aria-label={`${expandedParentIds.has(String(item.id)) ? '收起' : '展开'} ${item.title} 的子分类`}
+                aria-expanded={expandedParentIds.has(String(item.id))}
+                on:click={() => toggleParent(item)}
+              >
+                {expandedParentIds.has(String(item.id)) ? '▾' : '▸'}
+              </button>
+            {/if}
+          </div>
+          {#if item.children?.length && expandedParentIds.has(String(item.id)) && isExpanded}
+            <div class="toc-children">
+              {#each item.children as child (child.id)}
+                <button
+                  type="button"
+                  class="toc-child-item"
+                  title={child.title}
+                  class:active={String(activeId) === String(child.id)}
+                  aria-current={String(activeId) === String(child.id) ? 'location' : undefined}
+                  on:click={() => handleItemClick(child.id)}
+                >
+                  <span class="toc-child-title">
+                    {#if child.icon}
+                      <CategoryIcon category={getCategoryIconValue(child)} size={21} className="toc-child-icon" />
+                    {/if}
+                    <span>{child.title}</span>
+                  </span>
+                  {#if child.count != null}<small>{child.count}</small>{/if}
+                </button>
+              {/each}
+            </div>
+          {/if}
+        </div>
       {/each}
     </nav>
   </aside>
@@ -470,13 +700,27 @@
     scroll-behavior: auto;
   }
 
-  .top-item {
+  .top-item-group {
     flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    min-height: 38px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+  }
+
+  .top-item-group:focus-within,
+  .top-item-group:hover {
+    border-color: var(--toc-item-border);
+    background: var(--toc-item-bg);
+  }
+
+  .top-item {
     min-height: 38px;
     display: inline-flex;
     align-items: center;
     gap: 7px;
-    border: 1px solid transparent;
+    border: 0;
     border-radius: 8px;
     padding: 0 12px;
     background: transparent;
@@ -489,13 +733,11 @@
 
   .top-item:hover,
   .top-item:focus-visible {
-    border-color: var(--toc-item-border);
-    background: var(--toc-item-bg);
+    background: transparent;
     outline: none;
   }
 
   .top-item.active {
-    border-color: color-mix(in srgb, var(--toc-accent) 32%, var(--toc-item-border));
     background: var(--toc-item-hover-bg);
     color: var(--toc-accent);
   }
@@ -504,6 +746,93 @@
     color: inherit;
     opacity: 0.62;
     font-size: 11px;
+  }
+
+  .top-item :global(.top-category-icon),
+  .top-submenu-title :global(.top-submenu-icon) {
+    width: 22px;
+    height: 22px;
+    min-width: 22px;
+    border-radius: 6px;
+  }
+
+  .top-submenu-toggle {
+    width: 30px;
+    min-height: 32px;
+    margin-right: 3px;
+    border: 0;
+    border-left: 1px solid var(--toc-item-border);
+    border-radius: 0 6px 6px 0;
+    background: transparent;
+    color: var(--toc-text);
+    cursor: pointer;
+  }
+
+  .top-submenu-toggle:hover,
+  .top-submenu-toggle:focus-visible,
+  .top-submenu-toggle[aria-expanded='true'] {
+    background: var(--toc-item-hover-bg);
+    color: var(--toc-accent);
+    outline: none;
+  }
+
+  .top-submenu {
+    position: absolute;
+    z-index: 80;
+    box-sizing: border-box;
+    width: 220px;
+    max-height: min(360px, calc(100vh - 80px));
+    display: grid;
+    gap: 4px;
+    overflow-y: auto;
+    padding: 6px;
+    border: 1px solid var(--toc-border);
+    border-radius: 8px;
+    background: var(--toc-surface-strong);
+    box-shadow: var(--toc-shadow);
+    backdrop-filter: blur(16px);
+  }
+
+  .top-submenu button {
+    min-height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 0 10px;
+    background: transparent;
+    color: var(--toc-text);
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .top-submenu button:hover,
+  .top-submenu button:focus-visible,
+  .top-submenu button.active {
+    border-color: var(--toc-item-border);
+    background: var(--toc-item-hover-bg);
+    color: var(--toc-accent);
+    outline: none;
+  }
+
+  .top-submenu small {
+    opacity: 0.64;
+  }
+
+  .top-submenu-title {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .top-submenu-title > span:last-child {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .scroll-arrow {
@@ -593,7 +922,7 @@
   }
 
   .toc-sidebar.expanded {
-    width: 200px;
+    width: var(--toc-expanded-width, 232px);
     border-color: var(--toc-border);
     background: var(--toc-surface);
     box-shadow: var(--toc-shadow);
@@ -626,7 +955,7 @@
   }
 
   .toc-nav {
-    width: 200px;
+    width: var(--toc-expanded-width, 232px);
     max-height: calc(100dvh - 96px);
     display: grid;
     gap: 6px;
@@ -634,8 +963,19 @@
     scrollbar-width: thin;
   }
 
+  .toc-group {
+    display: grid;
+    gap: 3px;
+  }
+
+  .toc-parent-row {
+    width: calc(var(--toc-expanded-width, 232px) - 10px);
+    display: flex;
+    align-items: center;
+  }
+
   .toc-item {
-    width: 190px;
+    width: calc(var(--toc-expanded-width, 232px) - 42px);
     min-height: 34px;
     display: flex;
     align-items: center;
@@ -645,6 +985,97 @@
     background: transparent;
     color: var(--toc-text);
     cursor: pointer;
+  }
+
+  .toc-item small {
+    margin-left: auto;
+    opacity: 0;
+    font-size: 11px;
+  }
+
+  .toc-sidebar.expanded .toc-item small {
+    opacity: 0.62;
+  }
+
+  .toc-expand-button {
+    width: 30px;
+    height: 30px;
+    flex: 0 0 30px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--toc-text);
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  .toc-sidebar.expanded .toc-expand-button {
+    opacity: 0.78;
+  }
+
+  .toc-expand-button:hover,
+  .toc-expand-button:focus-visible {
+    background: var(--toc-item-hover-bg);
+    color: var(--toc-accent);
+    outline: none;
+  }
+
+  .toc-children {
+    display: grid;
+    gap: 3px;
+    margin-left: 40px;
+    padding-left: 10px;
+    border-left: 1px solid var(--toc-item-border);
+  }
+
+  .toc-child-item {
+    width: calc(var(--toc-expanded-width, 232px) - 60px);
+    min-height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 0 8px;
+    background: transparent;
+    color: var(--toc-text);
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .toc-child-item:hover,
+  .toc-child-item:focus-visible,
+  .toc-child-item.active {
+    border-color: var(--toc-item-border);
+    background: var(--toc-item-hover-bg);
+    color: var(--toc-accent);
+    outline: none;
+  }
+
+  .toc-child-title {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+
+  .toc-child-title > span:last-child {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .toc-child-title :global(.toc-child-icon) {
+    width: 21px;
+    height: 21px;
+    min-width: 21px;
+    border-radius: 6px;
+  }
+
+  .toc-child-item small {
+    opacity: 0.62;
   }
 
   .toc-sidebar.expanded .toc-item:hover,
@@ -674,6 +1105,32 @@
 
   .toc-item.active .toc-slip {
     background: var(--toc-accent);
+  }
+
+  .toc-icon-slot {
+    width: 40px;
+    height: 34px;
+    flex: 0 0 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .toc-icon-slot :global(.toc-category-icon) {
+    width: 26px;
+    height: 26px;
+    min-width: 26px;
+    border-radius: 7px;
+    transition: border-color 0.18s ease, transform 0.18s ease;
+  }
+
+  .toc-item:hover .toc-icon-slot :global(.toc-category-icon),
+  .toc-item:focus-visible .toc-icon-slot :global(.toc-category-icon) {
+    transform: scale(1.04);
+  }
+
+  .toc-item.active .toc-icon-slot :global(.toc-category-icon) {
+    border-color: color-mix(in srgb, var(--toc-accent) 58%, transparent);
   }
 
   .toc-title {
@@ -721,7 +1178,8 @@
     }
 
     .toc-sidebar {
-      width: 200px;
+      --toc-expanded-width: min(78vw, 280px);
+      width: var(--toc-expanded-width);
       padding-top: 54px;
       border-color: var(--toc-border);
       background: var(--toc-surface);

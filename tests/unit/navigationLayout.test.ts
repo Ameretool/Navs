@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 import {
   getHorizontalNavigationMetrics,
+  getAnchoredOverlayPosition,
   LEFT_NAV_COLLAPSED_STORAGE_KEY,
   parseLeftNavigationCollapsed,
   readLeftNavigationCollapsed,
@@ -49,6 +50,30 @@ describe('navigation layout helpers', () => {
     })
   })
 
+  it('left-aligns an overlay with its anchor and clamps it inside the viewport', () => {
+    expect(getAnchoredOverlayPosition({
+      anchorLeft: 160,
+      anchorBottom: 64,
+      overlayWidth: 220,
+      viewportWidth: 1200,
+    })).toEqual({ left: 160, top: 72 })
+
+    expect(getAnchoredOverlayPosition({
+      anchorLeft: 1100,
+      anchorRight: 1160,
+      anchorBottom: 64,
+      overlayWidth: 220,
+      viewportWidth: 1200,
+    })).toEqual({ left: 940, top: 72 })
+
+    expect(getAnchoredOverlayPosition({
+      anchorLeft: -20,
+      anchorBottom: 40,
+      overlayWidth: 220,
+      viewportWidth: 320,
+    })).toEqual({ left: 8, top: 48 })
+  })
+
   it('mutates the horizontal track through a local DOM reference while dragging', () => {
     const source = readFileSync('src/components/Sidebar.svelte', 'utf8')
 
@@ -58,5 +83,14 @@ describe('navigation layout helpers', () => {
     expect(source).toContain('track.scrollLeft = dragStartScrollLeft - delta')
     expect(source).not.toContain('topTrack.setPointerCapture(event.pointerId)')
     expect(source).not.toContain('topTrack.scrollLeft = dragStartScrollLeft - delta')
+  })
+
+  it('keeps top submenu keyboard focus inside the opened menu', () => {
+    const source = readFileSync('src/components/Sidebar.svelte', 'utf8')
+
+    expect(source).toContain("if (event?.detail === 0)")
+    expect(source).toContain('getTopMenuItems()[0]?.focus()')
+    expect(source).toContain('handleTopMenuKeyDown')
+    expect(source).toContain('closeTopMenu(true)')
   })
 })

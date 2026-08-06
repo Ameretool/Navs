@@ -8,6 +8,21 @@ export interface HorizontalNavigationMetrics {
   scrollStep: number
 }
 
+export interface AnchoredOverlayPositionInput {
+  anchorLeft: number
+  anchorRight?: number
+  anchorBottom: number
+  overlayWidth: number
+  viewportWidth: number
+  gap?: number
+  viewportMargin?: number
+}
+
+export interface AnchoredOverlayPosition {
+  left: number
+  top: number
+}
+
 export function parseLeftNavigationCollapsed(value: string | null): boolean {
   return value === 'true'
 }
@@ -52,5 +67,25 @@ export function getHorizontalNavigationMetrics(input: {
     canScrollRight: scrollLeft < maxScrollLeft - edgeTolerance,
     maxScrollLeft,
     scrollStep: Math.max(1, Math.round(clientWidth * 0.7)),
+  }
+}
+
+export function getAnchoredOverlayPosition({
+  anchorLeft,
+  anchorRight,
+  anchorBottom,
+  overlayWidth,
+  viewportWidth,
+  gap = 8,
+  viewportMargin = 8,
+}: AnchoredOverlayPositionInput): AnchoredOverlayPosition {
+  const maximumLeft = Math.max(viewportMargin, viewportWidth - overlayWidth - viewportMargin)
+  const preferredLeft = anchorLeft + overlayWidth <= viewportWidth - viewportMargin
+    ? anchorLeft
+    : (anchorRight ?? anchorLeft) - overlayWidth
+
+  return {
+    left: Math.min(Math.max(preferredLeft, viewportMargin), maximumLeft),
+    top: anchorBottom + gap,
   }
 }
