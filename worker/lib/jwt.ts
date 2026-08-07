@@ -57,7 +57,7 @@ export async function rotateJwtSecret(db: D1Database): Promise<string> {
   const secret = Array.from(buffer)
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('')
-  
+
   await setSettingValue(db, JWT_SECRET_KEY, secret)
   cachedJwtSecret = secret
   return secret

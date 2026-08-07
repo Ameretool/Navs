@@ -13,7 +13,7 @@ export function getSessionTtlSeconds(raw: string | undefined): number {
 export async function createSession(env: Env, username: string): Promise<LoginResp> {
   const ttlSeconds = getSessionTtlSeconds(env.SESSION_TTL)
   const expires_at = Date.now() + ttlSeconds * 1000
-  
+
   const secret = await getJwtSecret(env.DB)
   const session: SessionValue = { username, exp: expires_at }
   const token = await signJwt(session as unknown as Record<string, unknown>, secret)
