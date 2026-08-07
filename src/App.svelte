@@ -17,7 +17,7 @@
   import { clearCachedAdminData } from './lib/adminDataCache'
   import { clearCachedPublicData } from './lib/publicDataCache'
   import { toastStore } from './lib/toast'
-  import type { BookmarkFormValue, CategoryFormValue } from './lib/adminTypes'
+  import type { AdminTab, BookmarkFormValue, CategoryFormValue } from './lib/adminTypes'
   import { toBookmarkForm, toBookmarkPayload, toCategoryForm, toCategoryPayload } from './lib/adminFormAdapters'
   import {
     createImportExportState,
@@ -305,6 +305,16 @@
       await refreshLoggedInData(true)
     } catch (error) {
       // 写入已经成功；刷新失败时保留本地即时结果，并提示用户稍后重试。
+      rootError = getErrorMessage(error)
+    }
+  }
+
+  async function handleAdminTabChange(tab: AdminTab): Promise<void> {
+    if (tab !== 'analytics') return
+
+    try {
+      await refreshLoggedInData(true)
+    } catch (error) {
       rootError = getErrorMessage(error)
     }
   }
@@ -1015,6 +1025,7 @@
         onChangePassword={handleChangePassword}
         onSortCategories={handleSortCategories}
         onSortBookmarks={handleSortBookmarks}
+        onSelectTab={handleAdminTabChange}
         importing={importExportState.importing}
         backupError={importExportState.backupError}
         backupMessage={importExportState.backupMessage}

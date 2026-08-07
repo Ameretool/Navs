@@ -349,7 +349,7 @@ export const publicApi = {
   getData: (auth = false) =>
     request<PublicData>('/public/data', { auth, cache: 'no-store', headers: NO_CACHE_HEADERS }),
   registerClick: (id: number) =>
-    request<null>(`/public/bookmarks/${id}/click`, { method: 'POST' }),
+    request<null>(`/public/bookmarks/${id}/click`, { method: 'POST', keepalive: true }),
 }
 
 export const adminApi = {
