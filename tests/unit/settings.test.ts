@@ -35,6 +35,8 @@ const settings: Settings = {
   content_layout: { max_width: 1200, max_width_unit: 'px', margin_x: 0, margin_top: 0, margin_bottom: 0 },
   navigation: { position: 'left', always_expanded: false },
   footer_html: '<p>Footer</p>',
+  most_visited_count: 8,
+  site_title_show: true,
 }
 
 describe('shared settings metadata', () => {
@@ -48,8 +50,8 @@ describe('shared settings metadata', () => {
     expect(Object.keys(publicSettings)).toEqual([...PUBLIC_SETTINGS_KEYS])
     expect(publicSettings.site_title).toBe('CF-Navs')
     expect('public_mode' in publicSettings).toBe(false)
-    expect('custom_css' in publicSettings).toBe(false)
-    expect('custom_js' in publicSettings).toBe(false)
+    expect('custom_css' in publicSettings).toBe(true)
+    expect('custom_js' in publicSettings).toBe(true)
   })
 
   it('uses the public data key registry to fetch public mode plus public fields', () => {

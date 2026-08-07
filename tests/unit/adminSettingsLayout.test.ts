@@ -179,7 +179,8 @@ describe('admin settings layout', () => {
 
     expect(admin).toContain('@media (max-width: 720px)')
     expect(admin).toContain('flex-direction: column')
-    expect(sidebar).toContain('grid-template-columns: repeat(2, minmax(0, 1fr))')
+    expect(sidebar).toContain('position: fixed')
+    expect(sidebar).toContain('height: 60px')
     expect(content).toContain('height: auto')
     expect(panel).toContain('grid-template-columns: minmax(0, 1fr)')
     expect(panel).toContain('position: static')

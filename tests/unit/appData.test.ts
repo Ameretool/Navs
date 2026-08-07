@@ -97,6 +97,8 @@ const settings: Settings = {
   content_layout: { max_width: 1200, max_width_unit: 'px', margin_x: 0, margin_top: 0, margin_bottom: 0 },
   navigation: { position: 'top', always_expanded: true },
   footer_html: '<p>Footer</p>',
+  most_visited_count: 8,
+  site_title_show: true,
 }
 
 describe('app data adapters', () => {
@@ -122,7 +124,7 @@ describe('app data adapters', () => {
     expect(publicData.bookmarks).toEqual([toPublicBookmark(bookmarkA)])
     expect(publicData.settings).toEqual(toPublicSettings(settings))
     expect('public_mode' in publicData.settings).toBe(false)
-    expect('custom_js' in publicData.settings).toBe(false)
+    expect('custom_js' in publicData.settings).toBe(true)
   })
 
   it('keeps stable object references when merged data is unchanged', () => {
@@ -227,6 +229,7 @@ describe('app data adapters', () => {
       card_size: settings.card_size,
       card_style: settings.card_style,
       card_icon_size: settings.card_icon_size,
+      card_description_mode: settings.card_description_mode,
       card_show_description: settings.card_show_description,
       card_background_color: settings.card_background_color,
       card_background_opacity: settings.card_background_opacity,
@@ -237,6 +240,8 @@ describe('app data adapters', () => {
       content_layout: settings.content_layout,
       navigation: settings.navigation,
       footer_html: settings.footer_html,
+      most_visited_count: settings.most_visited_count,
+      site_title_show: settings.site_title_show,
     })
   })
 })

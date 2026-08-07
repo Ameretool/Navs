@@ -151,7 +151,7 @@ export function settingsFromRawMap(raw: Map<string, unknown>): Settings {
   out.background = normalizeBackgroundSetting(out.background, DEFAULT_SETTINGS.background)
   out.backgrounds = normalizeThemeBackgroundSettings(raw.get('backgrounds'), out.background)
   out.navigation = normalizeNavigationSetting(raw.get('navigation'))
-  out.most_visited_count = Math.min(20, Math.max(0, Math.round(Number(out.most_visited_count) || 8)))
+  out.most_visited_count = Math.min(20, Math.max(0, Math.round(Number(out.most_visited_count) || 0)))
   out.site_title_show = raw.has('site_title_show') ? Boolean(raw.get('site_title_show')) : true
   return out
 }
