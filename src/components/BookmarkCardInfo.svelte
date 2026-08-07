@@ -91,6 +91,15 @@
       border-color 0.16s ease;
   }
 
+  .bookmark-card:focus-visible {
+    outline: none !important;
+    border-color: rgba(56, 189, 248, 0.85) !important;
+    box-shadow:
+      0 0 0 3px rgba(56, 189, 248, 0.25),
+      0 8px 24px rgba(15, 23, 42, 0.16) !important;
+    transform: translateY(-2px);
+  }
+
   .bookmark-card-info {
     position: relative;
     display: flex;

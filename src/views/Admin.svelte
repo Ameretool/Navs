@@ -322,7 +322,21 @@
     .admin-layout {
       gap: 16px;
     }
+  }
 
+  @media (max-width: 700px) {
+    .admin-page {
+      padding: 12px;
+      padding-bottom: 76px;
+      height: 100dvh;
+      grid-template-rows: auto 1fr;
+    }
+
+    .admin-layout {
+      flex-direction: column;
+      align-items: stretch;
+      height: 100%;
+    }
   }
 
   @media (max-width: 720px) {

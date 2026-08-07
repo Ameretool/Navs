@@ -229,4 +229,61 @@ bookmarksRoutes.post('/:id/icon-cache/refresh', async (c) => {
   }
 })
 
+bookmarksRoutes.post('/check-health', async (c) => {
+  const body = await readJson<{ ids: number[] }>(c)
+  const ids = body?.ids
+  if (!Array.isArray(ids) || ids.length === 0 || !ids.every((id) => Number.isInteger(id) && id > 0)) {
+    return badRequest(c, 'invalid ids payload')
+  }
+
+  const targetIds = ids.slice(0, 20)
+
+  try {
+    const placeholders = targetIds.map(() => '?').join(',')
+    const { results } = await c.env.DB
+      .prepare(`SELECT id, url FROM bookmarks WHERE id IN (${placeholders})`)
+      .bind(...targetIds)
+      .all<{ id: number; url: string }>()
+
+    if (!results || results.length === 0) {
+      return c.json(ok([]))
+    }
+
+    const checkResult = await Promise.all(
+      results.map(async (bm) => {
+        try {
+          let res = await fetch(bm.url, {
+            method: 'HEAD',
+            redirect: 'follow',
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (compatible; CF-Navs-HealthCheck/1.0)',
+            },
+            signal: AbortSignal.timeout(3000),
+          })
+
+          if (!res.ok && (res.status === 405 || res.status === 403 || res.status === 400)) {
+            res = await fetch(bm.url, {
+              method: 'GET',
+              redirect: 'follow',
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (compatible; CF-Navs-HealthCheck/1.0)',
+              },
+              signal: AbortSignal.timeout(3000),
+            })
+          }
+
+          return { id: bm.id, status: res.status, ok: res.ok }
+        } catch (err) {
+          const isTimeout = err instanceof Error && err.name === 'TimeoutError'
+          return { id: bm.id, status: isTimeout ? 'timeout' : 'error', ok: false }
+        }
+      })
+    )
+
+    return c.json(ok(checkResult))
+  } catch {
+    return c.json(fail(ErrCode.SERVER_ERROR, 'failed to perform health check'))
+  }
+})
+
 export default bookmarksRoutes

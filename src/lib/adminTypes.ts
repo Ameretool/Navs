@@ -1,4 +1,4 @@
-export type AdminTab = 'categories' | 'bookmarks' | 'settings' | 'backup'
+export type AdminTab = 'categories' | 'bookmarks' | 'analytics' | 'settings' | 'backup'
 
 export type CategorySortHandler = (
   parentId: number | null,
