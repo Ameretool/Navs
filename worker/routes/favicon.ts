@@ -154,8 +154,8 @@ async function canFetchIcon(url: string): Promise<boolean> {
   }
 }
 
-function buildGoogleFallback(hostname: string): string {
-  return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(hostname)}&sz=64`
+function buildFaviconImFallback(hostname: string): string {
+  return `https://favicon.im/${encodeURIComponent(hostname)}?larger=true`
 }
 
 export const faviconRoutes = new Hono<HonoEnv>()
@@ -192,20 +192,20 @@ faviconRoutes.get('/fetch-favicon', async (c) => {
       return originFavicon
     }
 
-    return buildGoogleFallback(fallbackHostname)
+    return buildFaviconImFallback(fallbackHostname)
   }
 
   try {
-    // 整体兜底：无论解析链多慢，最多 OVERALL_DEADLINE_MS 后返回 Google 兜底，
+    // 整体兜底：无论解析链多慢，最多 OVERALL_DEADLINE_MS 后返回 favicon.im 兜底，
     // 避免前端「一键获取」按钮长时间转圈。
     const deadline = new Promise<string>((resolve) =>
-      setTimeout(() => resolve(buildGoogleFallback(targetUrl!.hostname)), OVERALL_DEADLINE_MS),
+      setTimeout(() => resolve(buildFaviconImFallback(targetUrl!.hostname)), OVERALL_DEADLINE_MS),
     )
     const icon = await Promise.race([resolveIcon(), deadline])
     return c.json(ok<FaviconResp>({ icon }))
   } catch {
-    // 任何异常也回退到 Google 兜底，保证总能给出一个可用图标
-    return c.json(ok<FaviconResp>({ icon: buildGoogleFallback(targetUrl.hostname) }))
+    // 任何异常也回退到 favicon.im 兜底，保证总能给出一个可用图标
+    return c.json(ok<FaviconResp>({ icon: buildFaviconImFallback(targetUrl.hostname) }))
   }
 })
 

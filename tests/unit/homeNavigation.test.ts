@@ -7,6 +7,7 @@ import {
   getHomeScrollTarget,
   getHomeCategoryGroups,
   getHomeSections,
+  getMostVisitedBookmarks,
   resolveActiveHomeRootId,
   resolveHomeActiveSectionId,
   resolveHomeCategoryForRoot,
@@ -114,6 +115,23 @@ describe('home navigation helpers', () => {
       [2, 620],
     ]), 96)).toBe(1)
     expect(resolveActiveHomeRootId(new Map(), 96)).toBeNull()
+  })
+
+  it('selects positive most-visited bookmarks without mutating the source', () => {
+    const items = [
+      { ...bookmark(4, 1), sort: 0, click_count: 0 },
+      { ...bookmark(3, 1), sort: 2, click_count: 8 },
+      { ...bookmark(2, 1), sort: 1, click_count: 8 },
+      { ...bookmark(1, 1), sort: 3, click_count: 12 },
+    ]
+    const originalIds = items.map((item) => item.id)
+
+    expect(getMostVisitedBookmarks(items, 3).map((item) => item.id)).toEqual([1, 2, 3])
+    expect(items.map((item) => item.id)).toEqual(originalIds)
+    expect(getMostVisitedBookmarks(items, 1.9).map((item) => item.id)).toEqual([1])
+    expect(getMostVisitedBookmarks(items, 20).map((item) => item.id)).toEqual([1, 2, 3])
+    expect(getMostVisitedBookmarks(items, 0)).toEqual([])
+    expect(getMostVisitedBookmarks(items, -4)).toEqual([])
   })
 
   it('clamps smooth-scroll targets to document bounds', () => {

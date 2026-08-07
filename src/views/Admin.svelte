@@ -93,6 +93,8 @@
   export let onChangePassword: ((payload: ChangePasswordReq) => AsyncVoid) | undefined = undefined
   export let onSortCategories: CategorySortHandler | undefined = undefined
   export let onSortBookmarks: SortHandler | undefined = undefined
+  // 切换后台标签时通知外层：访问分析需要强制拉取最新点击数据。
+  export let onSelectTab: ((tab: AdminTab) => AsyncVoid) | undefined = undefined
 
   export let importing = false
   export let backupError = ''
@@ -104,6 +106,7 @@
 
   function handleSelectTab(tab: AdminTab): void {
     activeTab = tab
+    void onSelectTab?.(tab)
   }
 
 </script>
@@ -322,7 +325,21 @@
     .admin-layout {
       gap: 16px;
     }
+  }
 
+  @media (max-width: 700px) {
+    .admin-page {
+      padding: 12px;
+      padding-bottom: 76px;
+      height: 100dvh;
+      grid-template-rows: auto 1fr;
+    }
+
+    .admin-layout {
+      flex-direction: column;
+      align-items: stretch;
+      height: 100%;
+    }
   }
 
   @media (max-width: 720px) {

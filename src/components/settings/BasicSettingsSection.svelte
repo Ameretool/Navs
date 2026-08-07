@@ -92,6 +92,7 @@
       </div>
       <small>{currentThemeHint}访客仍可在首页临时切换浅色或深色。</small>
     </div>
+
   </div>
 
   <div class="settings-subsection external-resource-section">

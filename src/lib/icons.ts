@@ -312,7 +312,7 @@ export function logoSurfIcon(title: string, url: string, scheme: LogoSurfColorSc
 
 export function googleIcon(url: string, size = 64): string {
   const hostname = getHostname(url)
-  return hostname ? `https://www.google.com/s2/favicons?sz=${size}&domain=${encodeURIComponent(hostname)}` : ''
+  return hostname ? `https://favicon.im/${encodeURIComponent(hostname)}?larger=true` : ''
 }
 
 export function getIconCandidates(url: string, title: string): IconCandidate[] {

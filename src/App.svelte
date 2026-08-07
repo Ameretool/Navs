@@ -17,7 +17,7 @@
   import { clearCachedAdminData } from './lib/adminDataCache'
   import { clearCachedPublicData } from './lib/publicDataCache'
   import { toastStore } from './lib/toast'
-  import type { BookmarkFormValue, CategoryFormValue } from './lib/adminTypes'
+  import type { AdminTab, BookmarkFormValue, CategoryFormValue } from './lib/adminTypes'
   import { toBookmarkForm, toBookmarkPayload, toCategoryForm, toCategoryPayload } from './lib/adminFormAdapters'
   import {
     createImportExportState,
@@ -199,6 +199,28 @@
   $: if (typeof document !== 'undefined') {
     document.documentElement.dataset.theme = activeTheme
     document.documentElement.dataset.backgroundPreset = publicData?.settings.background_preset_id ?? 'custom'
+
+    // OD-01: Custom CSS injection
+    let styleTag = document.getElementById('custom-css-inject');
+    if (!styleTag) {
+      styleTag = document.createElement('style');
+      styleTag.id = 'custom-css-inject';
+      document.head.appendChild(styleTag);
+    }
+    styleTag.textContent = publicData?.settings?.custom_css ?? '';
+
+    // OD-01: Custom JS injection
+    let scriptTag = document.getElementById('custom-js-inject');
+    if (scriptTag) {
+      scriptTag.remove();
+    }
+    const jsContent = publicData?.settings?.custom_js ?? '';
+    if (jsContent.trim()) {
+      scriptTag = document.createElement('script');
+      scriptTag.id = 'custom-js-inject';
+      scriptTag.textContent = jsContent;
+      document.body.appendChild(scriptTag);
+    }
   }
 
   function setPreferredThemeMode(mode: ThemeMode): void {
@@ -283,6 +305,16 @@
       await refreshLoggedInData(true)
     } catch (error) {
       // 写入已经成功；刷新失败时保留本地即时结果，并提示用户稍后重试。
+      rootError = getErrorMessage(error)
+    }
+  }
+
+  async function handleAdminTabChange(tab: AdminTab): Promise<void> {
+    if (tab !== 'analytics') return
+
+    try {
+      await refreshLoggedInData(true)
+    } catch (error) {
       rootError = getErrorMessage(error)
     }
   }
@@ -881,9 +913,17 @@
   <div class="app-splash">
     <div class="app-splash-card app-splash-card--loading" role="status" aria-live="polite" aria-busy="true">
       <div class="app-splash-mark" aria-hidden="true">
-        <span></span>
-        <span></span>
-        <span></span>
+        <svg class="app-splash-spinner" viewBox="0 0 50 50">
+          <circle class="ring" cx="25" cy="25" r="20" fill="none" stroke="url(#splash-spinner-grad-boot)" stroke-width="3.5"></circle>
+          <circle class="dot" cx="25" cy="25" r="4.5" fill="#2dd4bf"></circle>
+          <defs>
+            <linearGradient id="splash-spinner-grad-boot" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#38bdf8"></stop>
+              <stop offset="60%" stop-color="#2dd4bf"></stop>
+              <stop offset="100%" stop-color="#bef264"></stop>
+            </linearGradient>
+          </defs>
+        </svg>
       </div>
       <p class="eyebrow">CF-Navs</p>
       <h1>正在加载项目数据...</h1>
@@ -929,6 +969,19 @@
     {:else if currentView === 'login'}
       <div class="app-splash">
         <div class="app-splash-card">
+          <div class="app-splash-mark" aria-hidden="true">
+            <svg class="app-splash-spinner" viewBox="0 0 50 50">
+              <circle class="ring" cx="25" cy="25" r="20" fill="none" stroke="url(#splash-spinner-grad-login)" stroke-width="3.5"></circle>
+              <circle class="dot" cx="25" cy="25" r="4.5" fill="#2dd4bf"></circle>
+              <defs>
+                <linearGradient id="splash-spinner-grad-login" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#38bdf8"></stop>
+                  <stop offset="60%" stop-color="#2dd4bf"></stop>
+                  <stop offset="100%" stop-color="#bef264"></stop>
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
           <p class="eyebrow">CF-Navs</p>
           <h1>请先登录管理员账号</h1>
           <p>当前站点未公开，登录后再加载后台管理界面。</p>
@@ -972,6 +1025,7 @@
         onChangePassword={handleChangePassword}
         onSortCategories={handleSortCategories}
         onSortBookmarks={handleSortBookmarks}
+        onSelectTab={handleAdminTabChange}
         importing={importExportState.importing}
         backupError={importExportState.backupError}
         backupMessage={importExportState.backupMessage}
@@ -982,9 +1036,17 @@
       <div class="app-splash">
         <div class="app-splash-card app-splash-card--loading" role="status" aria-live="polite" aria-busy="true">
           <div class="app-splash-mark" aria-hidden="true">
-            <span></span>
-            <span></span>
-            <span></span>
+            <svg class="app-splash-spinner" viewBox="0 0 50 50">
+              <circle class="ring" cx="25" cy="25" r="20" fill="none" stroke="url(#splash-spinner-grad-admin)" stroke-width="3.5"></circle>
+              <circle class="dot" cx="25" cy="25" r="4.5" fill="#2dd4bf"></circle>
+              <defs>
+                <linearGradient id="splash-spinner-grad-admin" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#38bdf8"></stop>
+                  <stop offset="60%" stop-color="#2dd4bf"></stop>
+                  <stop offset="100%" stop-color="#bef264"></stop>
+                </linearGradient>
+              </defs>
+            </svg>
           </div>
           <p class="eyebrow">CF-Navs</p>
           <h1>正在加载后台...</h1>

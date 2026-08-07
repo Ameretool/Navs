@@ -19,7 +19,9 @@
   class:preview-light={preview && themeOverride === 'light'}
   aria-label="站点搜索"
 >
-  <h1 class="site-title" style="color: {siteTitleColor}; font-size: {siteTitleFontSize}px;">{pageTitle}</h1>
+  {#if settings?.site_title_show ?? true}
+    <h1 class="site-title" style="color: {siteTitleColor}; font-size: {siteTitleFontSize}px; -webkit-text-fill-color: {siteTitleColor === 'inherit' ? 'initial' : siteTitleColor}; background: none; -webkit-background-clip: unset;">{pageTitle}</h1>
+  {/if}
   {#if settings?.search_box_show ?? true}
     <div class="search-card">
       <SearchBox

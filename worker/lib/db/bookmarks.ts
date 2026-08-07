@@ -43,7 +43,7 @@ export async function createBookmark(db: D1Database, req: BookmarkUpsertReq): Pr
          )
          SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT MAX(sort) FROM bookmarks WHERE category_id = ?), -1) + 1, ?
          WHERE EXISTS (SELECT 1 FROM categories WHERE id = ?)
-         RETURNING id, category_id, title, url, icon, icon_source, icon_background_color, icon_blob, description, description_mode, open_method, sort, created_at`,
+         RETURNING id, category_id, title, url, icon, icon_source, icon_background_color, icon_blob, description, description_mode, open_method, sort, click_count, created_at`,
       )
       .bind(
         req.category_id,
@@ -93,7 +93,7 @@ export async function updateBookmark(
              description_mode = CASE WHEN ? = 0 THEN description_mode ELSE ? END,
              open_method = COALESCE(?, open_method)
          WHERE id = ? AND EXISTS (SELECT 1 FROM categories WHERE id = ?)
-         RETURNING id, category_id, title, url, icon, icon_source, icon_background_color, icon_blob, description, description_mode, open_method, sort, created_at`,
+         RETURNING id, category_id, title, url, icon, icon_source, icon_background_color, icon_blob, description, description_mode, open_method, sort, click_count, created_at`,
       )
       .bind(
         req.category_id,
@@ -137,4 +137,14 @@ export async function setIconBlob(db: D1Database, id: number, blob: string | nul
     .prepare("UPDATE bookmarks SET icon_blob = ? WHERE id = ?")
     .bind(blob, id)
     .run()
+}
+
+export async function incrementBookmarkClick(db: D1Database, id: number): Promise<boolean> {
+  return await withSchemaRetry(db, async () => {
+    const res = await db
+      .prepare("UPDATE bookmarks SET click_count = COALESCE(click_count, 0) + 1 WHERE id = ?")
+      .bind(id)
+      .run()
+    return (res.meta.changes ?? 0) > 0
+  })
 }

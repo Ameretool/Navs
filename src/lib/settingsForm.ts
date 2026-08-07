@@ -81,6 +81,8 @@ export const emptySettingsForm: SettingsFormModel = {
   content_layout: { max_width: 1200, max_width_unit: 'px', margin_x: 0, margin_top: 0, margin_bottom: 0 },
   navigation: { position: 'left', always_expanded: false },
   footer_html: '',
+  most_visited_count: 8,
+  site_title_show: true,
 }
 
 export function cloneSettingsForm(source: SettingsFormModel): SettingsFormModel {
@@ -117,6 +119,8 @@ export function cloneSettingsForm(source: SettingsFormModel): SettingsFormModel 
     content_layout: { ...source.content_layout },
     navigation: { ...source.navigation },
     footer_html: source.footer_html,
+    most_visited_count: source.most_visited_count,
+    site_title_show: source.site_title_show,
   }
 }
 
@@ -228,6 +232,8 @@ export function createSettingsFormState(
       always_expanded: navigation?.always_expanded ?? false,
     },
     footer_html: source?.footer_html ?? '',
+    most_visited_count: typeof source?.most_visited_count === 'number' ? source.most_visited_count : 8,
+    site_title_show: source?.site_title_show ?? true,
   }
 }
 
@@ -308,6 +314,8 @@ export function normalizeSettingsForm(source: SettingsFormModel): SettingsFormMo
       always_expanded: Boolean(source.navigation.always_expanded),
     },
     footer_html: source.footer_html.trim(),
+    most_visited_count: clampNumber(source.most_visited_count, 0, 20),
+    site_title_show: Boolean(source.site_title_show),
   }
 }
 

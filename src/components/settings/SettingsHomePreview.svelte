@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { PublicBookmark } from '../../../shared/types'
   import { buildHomeBackground } from '../../lib/appData'
+  import { getMostVisitedBookmarks } from '../../lib/homeData'
   import type { SettingsFormModel } from '../../lib/settingsForm'
   import BookmarkCard from '../BookmarkCard.svelte'
   import HomeHeroSearch from '../HomeHeroSearch.svelte'
@@ -28,6 +29,7 @@
       description_mode: null,
       open_method: 1,
       sort: 1,
+      click_count: 18,
     },
     {
       id: -102,
@@ -43,6 +45,7 @@
       description_mode: null,
       open_method: 1,
       sort: 2,
+      click_count: 9,
     },
   ]
 
@@ -68,6 +71,38 @@
   ].filter(Boolean).join('; ')
   $: descriptionMode = previewSettings.card_description_mode
   $: showDescription = descriptionMode !== 'hidden'
+  $: mostVisitedBookmarks = getMostVisitedBookmarks(previewBookmarks, previewSettings.most_visited_count)
+  $: safePreviewCss = previewSettings.custom_css.replace(/<\/style/gi, '<\\/style')
+  $: customContentPreview = `<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'none'; img-src data:; font-src 'none'; connect-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'">
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 18px; background: ${theme === 'dark' ? '#111827' : '#f8fafc'}; color: ${theme === 'dark' ? '#e5eefb' : '#0f172a'}; font: 14px/1.55 system-ui, sans-serif; }
+    .home-shell { min-height: 160px; }
+    .preview-category { margin-bottom: 18px; }
+    .preview-category h3 { margin: 0 0 10px; font-size: 15px; }
+    .bookmark-card { width: min(100%, 260px); padding: 12px 14px; border: 1px solid ${theme === 'dark' ? '#334155' : '#dbe3ee'}; border-radius: 10px; background: ${theme === 'dark' ? '#1e293b' : '#ffffff'}; }
+    .bookmark-card strong, .bookmark-card span { display: block; }
+    .bookmark-card span { margin-top: 3px; opacity: .68; font-size: 12px; }
+    .home-footer { margin-top: 20px; padding-top: 12px; border-top: 1px solid ${theme === 'dark' ? '#334155' : '#dbe3ee'}; }
+  </style>
+  <style>${safePreviewCss}</style>
+</head>
+<body>
+  <div class="home-shell">
+    <main class="home-content">
+      <section class="preview-category category-section">
+        <h3>自定义样式示例</h3>
+        <article class="bookmark-card"><strong>示例书签</strong><span>用于观察自定义 CSS 效果</span></article>
+      </section>
+    </main>
+    <footer class="home-footer">${previewSettings.footer_html || '<span>页脚 HTML 预览区域</span>'}</footer>
+  </div>
+</body>
+</html>`
 </script>
 
 <aside class="home-preview" aria-label="首页实时预览" data-testid="settings-home-preview">
@@ -144,6 +179,43 @@
         />
 
         <main class="preview-content">
+          {#if mostVisitedBookmarks.length > 0}
+            <section class="preview-category preview-most-visited" aria-label="经常访问预览" data-testid="preview-most-visited">
+              <header>
+                <div>
+                  <span class="category-mark" aria-hidden="true">常</span>
+                  <div>
+                    <h3>经常访问</h3>
+                    <p>显示 {mostVisitedBookmarks.length} 个示例，配置上限 {previewSettings.most_visited_count}</p>
+                  </div>
+                </div>
+              </header>
+
+              <div
+                class="preview-bookmarks"
+                class:is-icon={previewSettings.card_style === 'icon'}
+                data-card-style={previewSettings.card_style}
+              >
+                {#each mostVisitedBookmarks as bookmark (bookmark.id)}
+                  <div class="preview-bookmark">
+                    <BookmarkCard
+                      {bookmark}
+                      style={previewSettings.card_style}
+                      iconSize={previewSettings.card_icon_size}
+                      showDescription={previewSettings.card_style === 'info' && showDescription}
+                      descriptionMode={previewSettings.card_style === 'info' ? descriptionMode : 'hidden'}
+                      showIconTitle={previewSettings.card_icon_show_title}
+                      width={previewSettings.card_size.width}
+                      height={previewSettings.card_size.height}
+                      preview
+                      themeOverride={theme}
+                    />
+                  </div>
+                {/each}
+              </div>
+            </section>
+          {/if}
+
           <section class="preview-category" aria-label="常用工具示例分类">
             <header>
               <div>
@@ -179,6 +251,26 @@
                 </div>
               {/each}
             </div>
+          </section>
+
+          <section class="custom-content-preview" aria-label="页脚和自定义样式预览">
+            <header>
+              <h3>页脚与自定义样式</h3>
+              <p>内容在隔离环境中渲染，不影响管理页面。</p>
+            </header>
+            <iframe
+              title="页脚和自定义样式隔离预览"
+              data-testid="custom-content-preview"
+              sandbox=""
+              srcdoc={customContentPreview}
+              tabindex="-1"
+              aria-hidden="true"
+            ></iframe>
+            {#if previewSettings.custom_js.trim()}
+              <p class="script-preview-notice" data-testid="custom-js-preview-notice">
+                已配置自定义 JavaScript；为保护管理会话，预览不会执行，保存后仅在公开首页尝试应用。
+              </p>
+            {/if}
           </section>
         </main>
       </div>
@@ -314,6 +406,56 @@
   .preview-category {
     display: grid;
     gap: 12px;
+  }
+
+  .preview-most-visited {
+    margin-bottom: 24px;
+  }
+
+  .custom-content-preview {
+    display: grid;
+    gap: 10px;
+    margin-top: 26px;
+    padding-top: 18px;
+    border-top: 1px solid color-mix(in srgb, var(--card-title-color, currentColor) 16%, transparent);
+  }
+
+  .custom-content-preview header {
+    display: grid;
+    gap: 3px;
+  }
+
+  .custom-content-preview h3,
+  .custom-content-preview p {
+    margin: 0;
+  }
+
+  .custom-content-preview h3 {
+    color: var(--card-title-color, currentColor);
+    font-size: 14px;
+  }
+
+  .custom-content-preview p {
+    color: var(--card-description-color, currentColor);
+    font-size: 11px;
+    opacity: 0.78;
+  }
+
+  .custom-content-preview iframe {
+    width: 100%;
+    height: 220px;
+    border: 1px solid color-mix(in srgb, var(--theme-accent-color, #2563eb) 18%, transparent);
+    border-radius: 10px;
+    background: transparent;
+    pointer-events: none;
+  }
+
+  .custom-content-preview .script-preview-notice {
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: color-mix(in srgb, #f59e0b 12%, transparent);
+    color: var(--card-title-color, currentColor);
+    opacity: 0.9;
   }
 
   .preview-category header > div {

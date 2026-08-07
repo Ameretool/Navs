@@ -17,6 +17,7 @@
     getHomeCategoryGroups,
     getHomeScrollTarget,
     getHomeSections,
+    getMostVisitedBookmarks,
     getVisibleCategoryIds,
     getVisibleCategoryForest,
     groupBookmarksByCategory,
@@ -31,6 +32,13 @@
   const SEARCH_FILTER_DEBOUNCE_MS = 120
   const LEFT_NAV_SCROLL_TOP_OFFSET = 80
   const TOP_NAV_SCROLL_TOP_OFFSET = 88
+  const MOST_VISITED_CATEGORY: PublicCategory = {
+    id: -1,
+    parent_id: null,
+    title: '经常访问',
+    icon: '🔥',
+    sort: -1,
+  }
   const homeData = createHomeDataMemo()
 
   export let categories: PublicCategory[] = []
@@ -80,6 +88,9 @@
   $: visibleCategoryForest = getVisibleCategoryForest(categoryForest, visibleCategoryIds)
   $: visibleCategories = visibleCategoryForest.flatMap((category) => [category, ...category.children])
   $: visibleCategoryBookmarks = groupBookmarksByCategory(visibleBookmarks)
+  $: mostVisitedBookmarks = hasSearchQuery
+    ? []
+    : getMostVisitedBookmarks(sortedBookmarks, settings?.most_visited_count ?? 8)
 
   $: totalBookmarks = sortedBookmarks.length
   $: visibleBookmarkCount = visibleBookmarks.length
@@ -366,8 +377,25 @@
         {:else}
           <HomeEmptyPanel {hasSearchQuery} />
         {/if}
-      {:else if categoryGroups.length > 0}
-        <div class="root-category-list" aria-label="书签分类">
+      {:else if mostVisitedBookmarks.length > 0 || categoryGroups.length > 0}
+        {#if mostVisitedBookmarks.length > 0}
+          <CategorySection
+            category={MOST_VISITED_CATEGORY}
+            bookmarks={mostVisitedBookmarks}
+            showEmpty={false}
+            cardWidth={settings?.card_size?.width ?? 80}
+            cardHeight={settings?.card_size?.height ?? 60}
+            cardStyle={settings?.card_style ?? 'info'}
+            cardIconSize={settings?.card_icon_size ?? 60}
+            cardShowDescription={settings?.card_show_description ?? true}
+            cardDescriptionMode={settings?.card_description_mode ?? (settings?.card_show_description === false ? 'hidden' : 'always')}
+            cardIconShowTitle={settings?.card_icon_show_title ?? true}
+            canSort={false}
+            onEditBookmark={onEditBookmark}
+          />
+        {/if}
+        {#if categoryGroups.length > 0}
+          <div class="root-category-list" aria-label="书签分类">
           {#each categoryGroups as group (group.root.id)}
             {@const category = group.root}
             {@const selectedCategory = group.selected}
@@ -426,8 +454,9 @@
                 />
               </div>
             </section>
-          {/each}
-        </div>
+            {/each}
+          </div>
+        {/if}
       {:else}
         <HomeEmptyPanel />
       {/if}

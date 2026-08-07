@@ -34,11 +34,11 @@ describe('admin settings layout', () => {
 
     const sectionOrder = [
       '<BasicSettingsSection',
+      '<HeroSettingsSection',
       '<BackgroundSettingsSection',
       '<CardSettingsSection',
       '<AdvancedSettingsSection',
       '<NavigationSettingsSection',
-      '<HeroSettingsSection',
       '<SearchEngineSettingsSection',
       '<FooterSettingsSection',
       '<PasswordChangePanel',
@@ -47,7 +47,7 @@ describe('admin settings layout', () => {
     expect(positions.every((position) => position >= 0)).toBe(true)
     expect(new Set(positions).size).toBe(sectionOrder.length)
 
-    const labels = ['站点信息', '外观与卡片', '布局与导航', '搜索设置', '页脚内容', '账号安全']
+    const labels = ['站点设置', '外观与卡片', '布局与导航', '搜索设置', '自定义样式/脚本', '账号安全']
     const labelPositions = labels.map((label) => panel.indexOf(`label: '${label}'`))
     expect(labelPositions.every((position) => position >= 0)).toBe(true)
     expect(labelPositions).toEqual([...labelPositions].sort((a, b) => a - b))
@@ -89,6 +89,36 @@ describe('admin settings layout', () => {
     expect(hero).not.toContain('标题与搜索')
   })
 
+  it('places homepage display and custom content controls in their requested sections', () => {
+    const panel = readFileSync('src/components/SettingsPanel.svelte', 'utf8')
+    const basic = readFileSync('src/components/settings/BasicSettingsSection.svelte', 'utf8')
+    const hero = readFileSync('src/components/settings/HeroSettingsSection.svelte', 'utf8')
+    const footer = readFileSync('src/components/settings/FooterSettingsSection.svelte', 'utf8')
+
+    const basicBranch = panel.slice(
+      panel.indexOf("{#if activeSectionId === 'basic'}"),
+      panel.indexOf("{:else if activeSectionId === 'appearance'}"),
+    )
+    const searchBranch = panel.slice(
+      panel.indexOf("{:else if activeSectionId === 'search'}"),
+      panel.indexOf("{:else if activeSectionId === 'footer'}"),
+    )
+
+    expect(basicBranch).toContain('<BasicSettingsSection')
+    expect(basicBranch).toContain('<HeroSettingsSection')
+    expect(searchBranch).toContain('<SearchEngineSettingsSection')
+    expect(searchBranch).not.toContain('<HeroSettingsSection')
+    expect(hero).toContain('bind:value={form.most_visited_count}')
+    expect(hero).toContain('bind:checked={form.site_title_show}')
+    expect(hero).toContain('.field-range {\n    grid-column: 1 / -1;')
+    expect(basic).not.toContain('form.custom_css')
+    expect(basic).not.toContain('form.custom_js')
+    expect(footer).toContain('bind:value={form.footer_html}')
+    expect(footer).toContain('bind:value={form.custom_css}')
+    expect(footer).toContain('bind:value={form.custom_js}')
+    expect(footer).toContain('.field.full-width {\n    grid-column: 1 / -1;')
+  })
+
   it('connects a read-only live preview driven by the normalized form', () => {
     const panel = readFileSync('src/components/SettingsPanel.svelte', 'utf8')
     const preview = readFileSync('src/components/settings/SettingsHomePreview.svelte', 'utf8')
@@ -97,6 +127,7 @@ describe('admin settings layout', () => {
     expect(preview).toContain("import { buildHomeBackground } from '../../lib/appData'")
     expect(preview).toContain("import BookmarkCard from '../BookmarkCard.svelte'")
     expect(preview).toContain("import HomeHeroSearch from '../HomeHeroSearch.svelte'")
+    expect(preview).toContain("import { getMostVisitedBookmarks } from '../../lib/homeData'")
     expect(preview).toContain('data-theme={theme}')
     expect(preview).toContain('data-background-preset={previewSettings.background_preset_id}')
     expect(preview).toContain('inert')
@@ -106,8 +137,31 @@ describe('admin settings layout', () => {
     expect(preview).toContain('width={previewSettings.card_size.width}')
     expect(preview).toContain('height={previewSettings.card_size.height}')
     expect(preview).toContain("previewSettings.navigation.position === 'top'")
+    expect(preview).toContain('sandbox=""')
+    expect(preview).toContain('srcdoc={customContentPreview}')
+    expect(preview).toContain("script-src 'none'")
+    expect(preview).toContain('custom-js-preview-notice')
+    expect(preview).not.toContain('allow-scripts')
+    expect(preview).not.toContain('allow-same-origin')
+    expect(preview).not.toContain('eval(')
+    expect(preview).not.toContain('new Function')
     expect(preview).not.toContain('fetch(')
     expect(preview).not.toContain('/api/')
+  })
+
+  it('paginates zero-visit analytics inside the bookmark-list height contract', () => {
+    const analytics = readFileSync('src/components/admin/AnalyticsPanel.svelte', 'utf8')
+
+    expect(analytics).toContain('createAdminListPage')
+    expect(analytics).toContain('getAdminListTotalPages')
+    expect(analytics).toContain('clampAdminListPage')
+    expect(analytics).toContain('{#each zeroVisitListPage.items as bookmark}')
+    expect(analytics).toContain('class="admin-panel-footer"')
+    expect(analytics).toContain('class="admin-pagination"')
+    expect(analytics).toContain('上一页')
+    expect(analytics).toContain('下一页')
+    expect(analytics).toContain('height: min(760px, calc(100vh - 220px))')
+    expect(analytics).toContain('grid-template-rows: auto minmax(0, 1fr) auto')
   })
 
   it('keeps common appearance controls visible and gates advanced controls', () => {
@@ -179,7 +233,8 @@ describe('admin settings layout', () => {
 
     expect(admin).toContain('@media (max-width: 720px)')
     expect(admin).toContain('flex-direction: column')
-    expect(sidebar).toContain('grid-template-columns: repeat(2, minmax(0, 1fr))')
+    expect(sidebar).toContain('position: fixed')
+    expect(sidebar).toContain('height: 60px')
     expect(content).toContain('height: auto')
     expect(panel).toContain('grid-template-columns: minmax(0, 1fr)')
     expect(panel).toContain('position: static')

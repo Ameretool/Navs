@@ -1,4 +1,4 @@
-﻿.admin-list-view {
+.admin-list-view {
   display: grid;
   grid-template-rows: auto auto;
   gap: 16px;
@@ -357,14 +357,66 @@
   }
 }
 
-@media (max-width: 640px) {
-  .admin-list-panel-header {
-    align-items: stretch;
-    flex-direction: column;
-  }
+.admin-health-progress {
+  display: inline-flex;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--admin-subtle);
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--admin-nav-hover-bg);
+  border: 1px solid var(--admin-border);
+}
 
+.admin-url-badge-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.health-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  line-height: 1.2;
+}
+
+.health-badge.ok {
+  background: rgba(34, 197, 94, 0.12);
+  color: rgb(34, 197, 94);
+  border: 1px solid rgba(34, 197, 94, 0.22);
+}
+
+.health-badge.error {
+  background: rgba(239, 68, 68, 0.12);
+  color: rgb(239, 68, 68);
+  border: 1px solid rgba(239, 68, 68, 0.22);
+}
+
+@media (max-width: 700px) {
+  .col-open-method,
+  .col-url {
+    display: none !important;
+  }
+  .admin-bookmark-table col:nth-child(3),
+  .admin-bookmark-table col:nth-child(5) {
+    display: none !important;
+  }
+  .admin-list-panel-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
   .admin-header-actions-row {
+    overflow-x: auto;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
     width: 100%;
-    flex-wrap: wrap;
+    justify-content: flex-start;
   }
 }

@@ -104,6 +104,18 @@ function createPublicStore() {
     refresh,
     reset: () => set(createLoadableState<PublicData | null>(null)),
     setData: (data: PublicData | null) => set({ data, loading: false, loaded: data !== null, error: null }),
+    incrementClick: (bookmarkId: number) => {
+      update((state) => {
+        if (!state.data) return state
+        const bookmarks = state.data.bookmarks.map((bm) => {
+          if (bm.id === bookmarkId) {
+            return { ...bm, click_count: (bm.click_count ?? 0) + 1 }
+          }
+          return bm
+        })
+        return { ...state, data: { ...state.data, bookmarks } }
+      })
+    },
     setDataProgressively: (data: PublicData) => {
       const BATCH_SIZE = 60
       const all = data.bookmarks

@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS bookmarks (
   description_mode TEXT,
   open_method  INTEGER NOT NULL DEFAULT 1,-- 1=新窗口 2=当前页 3=当前页弹层
   sort         INTEGER NOT NULL DEFAULT 0,
+  click_count  INTEGER NOT NULL DEFAULT 0,
   created_at   INTEGER NOT NULL
 );
 
@@ -59,6 +60,8 @@ INSERT OR IGNORE INTO settings (key, value) VALUES
   ('custom_css', '""'),
   ('custom_js', '""'),
   ('image_host_url', '""'),
+  ('site_title_show', 'true'),
+  ('most_visited_count', '8'),
   ('search_engine', '{"current":"Google","engines":[{"name":"Google","icon":"","url_template":"https://www.google.com/search?q={q}"},{"name":"Bing","icon":"","url_template":"https://www.bing.com/search?q={q}"}]}'),
   ('card_size', '{"width":80,"height":60}'),
   ('card_style', '"info"'),

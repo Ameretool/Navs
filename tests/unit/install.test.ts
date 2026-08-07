@@ -1,6 +1,7 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi, beforeEach } from 'vitest'
 import type { ApiResponse, InstallStatusResp, LoginResp } from '../../shared/types'
 import { verifyPassword } from '../../worker/lib/crypto'
+import { resetJwtSecretCache } from '../../worker/lib/jwt'
 
 vi.mock('../../schema.sql', () => ({ default: 'CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT);' }))
 
@@ -19,6 +20,7 @@ class FakeDb {
   failSchemaBatch = false
   failCredentialBatchOnce = false
   failClaimDeleteOnce = false
+  failSettingsWrite = false
 
   constructor(initial: Record<string, unknown> = {}) {
     for (const [key, value] of Object.entries(initial)) this.settings.set(key, JSON.stringify(value))
@@ -121,6 +123,9 @@ class FakeDb {
       return 1
     }
     if (sql.includes('INSERT INTO settings')) {
+      if (this.failSettingsWrite && params[0] === 'jwt_secret') {
+        throw new Error('D1 write failed')
+      }
       this.settings.set(String(params[0]), String(params[1]))
       return 1
     }
@@ -173,6 +178,10 @@ function postBody(username = 'admin', password = 'secure-password'): RequestInit
 }
 
 describe('installer routes', () => {
+  beforeEach(() => {
+    resetJwtSecretCache()
+  })
+
   it('publishes only coarse no-store readiness without a setup token', async () => {
     const result = await request(createEnv(new FakeDb()), '/install/status')
     expect(result.response.status).toBe(200)
@@ -276,14 +285,13 @@ describe('installer routes', () => {
     expect(db.settings.get('admin_bootstrap_password')).toBe(db.settings.get('admin_password'))
     expect(JSON.parse(db.settings.get('installation_schema_version') ?? 'null')).toBe(1)
     expect(data).toMatchObject({ username: 'admin' })
-    expect(data.token).toMatch(/^[a-f0-9]{64}$/)
-    expect(kv.puts.at(-1)).toMatchObject({ key: `sess:${data.token}`, ttl: 3600 })
-    expect(JSON.parse(kv.puts.at(-1)!.value)).toEqual({ username: 'admin', exp: data.expires_at })
+    expect(data.token).toMatch(/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/)
   })
 
   it('keeps the committed installation locked when session creation fails', async () => {
     const db = new FakeDb()
-    const failed = await request(createEnv(db, createKv({ failPut: true })), '/install', postBody())
+    db.failSettingsWrite = true
+    const failed = await request(createEnv(db), '/install', postBody())
     expect(failed.body).toEqual({ code: 1500, msg: 'installation completed but session creation failed', data: null })
     expect(JSON.parse(db.settings.get('installation_schema_version') ?? 'null')).toBe(1)
     const status = await request(createEnv(db), '/install/status')

@@ -76,7 +76,6 @@ authRoutes.post('/logout', authRequired, async (c) => {
   const token = extractBearerToken(c.req.header('Authorization'))
   if (token) {
     clearCachedSession(token)
-    await c.env.SESSION.delete(getSessionKey(token))
   }
   return c.json(ok(null))
 })

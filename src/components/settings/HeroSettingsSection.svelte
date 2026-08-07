@@ -12,10 +12,35 @@
 </script>
 
 <fieldset id="settings-section-search-display" class="group group-wide" disabled={saving}>
-  <legend>搜索显示</legend>
-  <p class="group-desc">控制首页搜索区域及默认引擎入口是否向访客显示。</p>
+  <legend>首页显示</legend>
+  <p class="group-desc">控制首页标题、搜索入口和「经常访问」区域的显示方式。</p>
 
   <div class="form-grid search-display-grid">
+    <label class="field field-range">
+      <span>经常访问展示数量 <em>{form.most_visited_count === 0 ? '已禁用' : form.most_visited_count}</em></span>
+      <input
+        bind:value={form.most_visited_count}
+        type="range"
+        min="0"
+        max="20"
+        step="1"
+        on:input={() => void syncForm()}
+      />
+      <small>设置首页顶部「经常访问」区域展示的书签上限。设为 0 可完全隐藏该区域。</small>
+    </label>
+
+    <label class="toggle-field field-toggle">
+      <div class="toggle-copy">
+        <span>显示站点标题</span>
+        <p>关闭后首页不再展示大标题字样。</p>
+      </div>
+      <input
+        bind:checked={form.site_title_show}
+        on:change={() => void syncForm()}
+        type="checkbox"
+      />
+    </label>
+
     <label class="toggle-field field-toggle">
       <div class="toggle-copy">
         <span>显示搜索框</span>
@@ -43,8 +68,12 @@
 </fieldset>
 
 <style>
+  .field-range {
+    grid-column: 1 / -1;
+  }
+
   .field-toggle {
-    grid-column: span 6;
+    grid-column: span 4;
   }
 
   @media (max-width: 960px) {
