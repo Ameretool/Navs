@@ -1,5 +1,11 @@
 <script lang="ts">
   import type { AdminBookmarkSummary, AdminCategorySummary } from '../../lib/appData'
+  import {
+    clampAdminListPage,
+    createAdminListPage,
+    getAdminCategoryPathMap,
+    getAdminListTotalPages,
+  } from '../../lib/adminListState'
   import { getBookmarkFallbackIcon, getBookmarkIconUrl, hasBookmarkImageIcon } from '../../lib/bookmarkIconDisplay'
   import CachedBookmarkIcon from '../CachedBookmarkIcon.svelte'
   import './adminListPanels.css'
@@ -10,22 +16,23 @@
   export let bookmarks: AdminBookmark[] = []
   export let categories: AdminCategory[] = []
 
+  let zeroVisitPage = 1
+
   $: sortedBookmarks = [...bookmarks]
     .sort((a, b) => (b.click_count ?? 0) - (a.click_count ?? 0))
 
   $: topBookmarks = sortedBookmarks.slice(0, 20).filter(b => (b.click_count ?? 0) > 0)
   $: zeroVisitBookmarks = bookmarks.filter(b => (b.click_count ?? 0) === 0)
+  $: categoryTitleById = getAdminCategoryPathMap(categories)
+  $: zeroVisitTotalPages = getAdminListTotalPages(zeroVisitBookmarks.length)
+  $: zeroVisitPage = clampAdminListPage(zeroVisitPage, zeroVisitTotalPages)
+  $: zeroVisitListPage = createAdminListPage(zeroVisitBookmarks, zeroVisitPage)
 
   $: totalClicks = bookmarks.reduce((acc, curr) => acc + (curr.click_count ?? 0), 0)
   $: clickedCount = bookmarks.filter(b => (b.click_count ?? 0) > 0).length
-  $: zeroCount = zeroVisitBookmarks.length
 
   $: maxClicks = topBookmarks[0]?.click_count ?? 1
 
-  function getCategoryTitle(categoryId: string | number) {
-    const cat = categories.find((c) => String(c.id) === String(categoryId))
-    return cat ? cat.title : '未知分类'
-  }
 </script>
 
 <div class="admin-list-view">
@@ -41,7 +48,7 @@
     </div>
     <div class="admin-status-item">
       <span class="admin-status-label">零访问书签数</span>
-      <p style="font-size: 28px; font-weight: 700; color: var(--admin-danger); margin: 0;">{zeroCount}</p>
+      <p style="font-size: 28px; font-weight: 700; color: var(--admin-danger); margin: 0;">{zeroVisitBookmarks.length}</p>
     </div>
   </section>
 
@@ -86,7 +93,7 @@
                 <div class="top-item-info">
                   <div class="top-item-meta">
                     <strong>{bookmark.title}</strong>
-                    <span class="top-item-cat">{getCategoryTitle(bookmark.category_id)}</span>
+                    <span class="top-item-cat">{categoryTitleById.get(bookmark.category_id) ?? '未知分类'}</span>
                   </div>
                   <div class="progress-bar-wrap">
                     <div class="progress-bar" style="width: {((bookmark.click_count ?? 0) / maxClicks) * 100}%;"></div>
@@ -101,14 +108,14 @@
     </section>
 
     <!-- 零访问冷门书签 -->
-    <section class="admin-list-panel">
+    <section class="admin-list-panel zero-visit-panel">
       <div class="admin-list-panel-header">
         <div>
           <p class="admin-panel-eyebrow">冷门分析</p>
           <h2>零访问书签</h2>
         </div>
       </div>
-      <div class="admin-panel-scroll-body" style="padding: 16px 20px;">
+      <div class="admin-panel-scroll-body zero-visit-scroll-body">
         {#if zeroVisitBookmarks.length === 0}
           <div class="admin-empty-state" style="min-height: 150px;">
             <span class="admin-empty-state-icon">🎉</span>
@@ -117,7 +124,7 @@
           </div>
         {:else}
           <div class="zero-list">
-            {#each zeroVisitBookmarks as bookmark}
+            {#each zeroVisitListPage.items as bookmark}
               <div class="zero-item">
                 <span class="admin-icon-badge small" style={bookmark.icon_background_color ? `background: ${bookmark.icon_background_color};` : ''}>
                   {#if hasBookmarkImageIcon(bookmark)}
@@ -137,7 +144,7 @@
                 </span>
                 <div class="zero-item-info">
                   <strong>{bookmark.title}</strong>
-                  <span class="zero-item-cat">{getCategoryTitle(bookmark.category_id)}</span>
+                  <span class="zero-item-cat">{categoryTitleById.get(bookmark.category_id) ?? '未知分类'}</span>
                   <a href={bookmark.url} target="_blank" rel="noreferrer" class="zero-item-url">{bookmark.url}</a>
                 </div>
               </div>
@@ -145,11 +152,34 @@
           </div>
         {/if}
       </div>
+      {#if zeroVisitBookmarks.length > 0}
+        <div class="admin-panel-footer">
+          <div class="admin-pagination">
+            <span>第 {zeroVisitListPage.start}-{zeroVisitListPage.end} 条 / 共 {zeroVisitListPage.total} 条</span>
+            <div class="admin-pager-actions">
+              <button type="button" class="admin-ghost-button compact" on:click={() => zeroVisitPage -= 1} disabled={zeroVisitPage <= 1}>上一页</button>
+              <span>{zeroVisitPage} / {zeroVisitTotalPages}</span>
+              <button type="button" class="admin-ghost-button compact" on:click={() => zeroVisitPage += 1} disabled={zeroVisitPage >= zeroVisitTotalPages}>下一页</button>
+            </div>
+          </div>
+        </div>
+      {/if}
     </section>
   </div>
 </div>
 
 <style>
+  .zero-visit-panel {
+    height: min(760px, calc(100vh - 220px));
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    min-width: 0;
+  }
+
+  .zero-visit-scroll-body {
+    padding: 16px 20px;
+    overflow: auto;
+  }
+
   .analytics-grids {
     display: grid;
     grid-template-columns: 1.2fr 0.8fr;

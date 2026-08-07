@@ -85,6 +85,20 @@ export function groupBookmarksByCategory(items: PublicBookmark[]): Map<number, P
   return grouped
 }
 
+export function getMostVisitedBookmarks(items: PublicBookmark[], limit: number): PublicBookmark[] {
+  const normalizedLimit = Math.max(0, Math.floor(Number(limit) || 0))
+  if (normalizedLimit === 0) return []
+
+  return items
+    .filter((bookmark) => (bookmark.click_count ?? 0) > 0)
+    .sort((a, b) => (
+      (b.click_count ?? 0) - (a.click_count ?? 0)
+      || a.sort - b.sort
+      || a.id - b.id
+    ))
+    .slice(0, normalizedLimit)
+}
+
 export function getCategoryTreeBookmarkCount(
   category: CategoryNode<PublicCategory>,
   categoryBookmarks: Map<number, PublicBookmark[]>,

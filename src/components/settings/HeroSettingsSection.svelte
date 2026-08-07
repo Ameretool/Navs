@@ -12,8 +12,8 @@
 </script>
 
 <fieldset id="settings-section-search-display" class="group group-wide" disabled={saving}>
-  <legend>搜索显示</legend>
-  <p class="group-desc">控制首页搜索区域及默认引擎入口是否向访客显示。</p>
+  <legend>首页显示</legend>
+  <p class="group-desc">控制首页标题、搜索入口和「经常访问」区域的显示方式。</p>
 
   <div class="form-grid search-display-grid">
     <label class="field field-range">
@@ -68,8 +68,12 @@
 </fieldset>
 
 <style>
+  .field-range {
+    grid-column: 1 / -1;
+  }
+
   .field-toggle {
-    grid-column: span 6;
+    grid-column: span 4;
   }
 
   @media (max-width: 960px) {

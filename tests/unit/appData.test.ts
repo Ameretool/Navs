@@ -46,6 +46,7 @@ const bookmarkA: Bookmark = {
   description: null,
   open_method: 1,
   sort: 0,
+  click_count: 17,
   created_at: 200,
 }
 
@@ -122,6 +123,7 @@ describe('app data adapters', () => {
 
     expect(publicData.categories).toBeDefined()
     expect(publicData.bookmarks).toEqual([toPublicBookmark(bookmarkA)])
+    expect(publicData.bookmarks[0].click_count).toBe(17)
     expect(publicData.settings).toEqual(toPublicSettings(settings))
     expect('public_mode' in publicData.settings).toBe(false)
     expect('custom_js' in publicData.settings).toBe(true)

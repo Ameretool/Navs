@@ -31,11 +31,11 @@
   export let onChangePassword: ((payload: ChangePasswordReq) => AsyncVoid) | undefined = undefined
 
   const settingsSections = [
-    { id: 'basic', label: '站点信息', hint: '标题、访问范围与默认主题' },
+    { id: 'basic', label: '站点设置', hint: '标题、首页显示与默认主题' },
     { id: 'appearance', label: '外观与卡片', hint: '配色、背景与书签卡片' },
     { id: 'layout', label: '布局与导航', hint: '内容宽度、边距与导航位置' },
-    { id: 'search', label: '搜索设置', hint: '显示范围与搜索引擎' },
-    { id: 'footer', label: '页脚内容', hint: '首页底部自定义内容' },
+    { id: 'search', label: '搜索设置', hint: '默认引擎与搜索服务' },
+    { id: 'footer', label: '自定义样式/脚本', hint: '页脚、CSS 与 JavaScript' },
     { id: 'account', label: '账号安全', hint: '修改管理员密码' },
   ]
 
@@ -144,6 +144,7 @@
         <div class="settings-section-content">
           {#if activeSectionId === 'basic'}
             <BasicSettingsSection bind:form {saving} />
+            <HeroSettingsSection bind:form {saving} />
           {:else if activeSectionId === 'appearance'}
             <BackgroundSettingsSection
               bind:form
@@ -160,10 +161,6 @@
           {:else if activeSectionId === 'layout'}
             <NavigationSettingsSection bind:form {saving} />
           {:else if activeSectionId === 'search'}
-            <HeroSettingsSection bind:form {saving} />
-          {/if}
-
-          {#if activeSectionId === 'search'}
             <SearchEngineSettingsSection bind:form {saving} {enginesValid} />
           {:else if activeSectionId === 'footer'}
             <FooterSettingsSection bind:form {saving} />
