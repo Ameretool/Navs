@@ -7,7 +7,7 @@
 - 所有接口前缀为 `/api`。
 - 常规响应使用统一包络：`{ code, msg, data }`。
 - 业务错误通常仍返回 HTTP 200，用 `code` 区分；认证中间件拦截返回 HTTP 401 且 `code=1001`。
-- 写操作使用 `Authorization: Bearer <token>` 鉴权。
+- 受保护的写操作使用 `Authorization: Bearer <token>` 鉴权；安装接口使用一次性的 `X-Setup-Token`，公开点击计数接口不要求登录。
 - 时间戳使用毫秒数，即 `Date.now()`。
 
 ## 鉴权规则
@@ -24,11 +24,23 @@
 | GET | `/api/config` | 无 | `SiteConfig` |
 | GET | `/api/data/version` | 公开模式或登录 | `DataVersionResp` |
 | GET | `/api/public/data` | 公开模式或登录 | `PublicData` |
+| POST | `/api/public/bookmarks/:id/click` | 无 | `null` |
 | POST | `/api/error-report` | 无 | `{ received: number }` |
 
 `/api/config` 使用短 TTL Cloudflare edge cache，设置保存或数据导入后会主动失效，主要作为兼容和兜底轻量配置接口。前端普通启动路径优先使用本地快照加 `/api/data/version` 做远端确认；本地无可用快照或版本变化时，才请求 `/api/public/data` 或 `/api/admin/data` 派生站点配置。公开模式关闭时，匿名 `/api/public/data` 的 1005 响应会在 `data` 中携带 `{ site_title, public_mode: false }`，登录页无需再额外请求 `/api/config`。该 1005 响应使用浏览器 `max-age=0` 和短 edge TTL，避免本地浏览器缓存卡住公开模式切换，同时减少私有站点匿名访问对 D1 的重复读取。`/api/public/data` 只查询并返回首页渲染需要的公开设置、分类和书签字段，书签公开字段包含用于本地优先图标展示的 `icon_blob`，但不包含 `admin_username`、`admin_password`、`public_mode`、`custom_css`、`custom_js` 等内部或未使用设置字段，也不包含分类/书签的 `created_at` 管理字段；未携带 no-cache 指令的匿名公开访问会先查短 TTL edge cache，命中时直接返回而不读取 D1。前端拉取完整聚合数据时默认带 `Cache-Control: no-cache`、`Pragma: no-cache` 和 fetch `cache: "no-store"`；服务端收到 no-cache 指令或带登录态请求时会绕过匿名缓存。缓存未命中时，服务端先复用或预热 `/api/config` 的轻量 edge cache 来判断是否公开，公开时再通过一次 D1 batch 聚合读取公开 settings、分类和书签；如果同一请求刚从 D1 读取过 `site_title/public_mode`，公开 settings 查询会跳过这两行并把已知值合并回响应。
 
 `/api/error-report` 接收前端运行时错误上报，payload 为 `{ errors: ErrorReportEntry[] }` 或单个 `ErrorReportEntry`。该接口不要求登录，但限制请求体为 16 KB、单批最多 10 条，并对消息、分类、URL 和行列字段做类型与长度归一化；有效请求通过 D1 原子计数按来源 IP 限制为每分钟 12 次，已封禁来源可由当前 Worker isolate 内存快速拒绝。超大请求返回 HTTP 413，高频请求返回 HTTP 429，无效 JSON 或无有效条目返回 HTTP 400。Worker 只把有限字段写入 `console.error`，响应中的 `received` 表示实际接收条数；前端会对同一错误做 60 秒去重，且上报失败不得影响页面主流程。
+
+`POST /api/public/bookmarks/:id/click` 由首页在打开书签时调用，成功后将对应 `click_count` 加一。每个 IP 与书签 ID 组合在 10 分钟内最多计数 3 次，超过后仍返回成功但不重复增加计数；点击计数不会提升 `data_version`，后台访问分析打开时会强制刷新后台聚合数据。
+
+## 安装接口
+
+| 方法 | 路径 | 鉴权 | 请求 | 返回 |
+| --- | --- | --- | --- | --- |
+| GET | `/api/install/status` | 无 | 无 | `InstallStatusResp` |
+| POST | `/api/install` | `X-Setup-Token` + 同源请求 | `InstallReq` | `LoginResp` |
+
+`POST /api/install` 只允许同源请求，在数据库未安装时校验 `X-Setup-Token`，初始化内置 schema、创建管理员并返回登录会话。安装状态、绑定缺失、数据库不可用和缺少 `SETUP_TOKEN` 均通过 `InstallStatusResp` 区分；安装完成后再次安装会被拒绝。
 
 ## 认证接口
 
@@ -36,6 +48,7 @@
 | --- | --- | --- | --- |
 | POST | `/api/login` | `LoginReq` | `LoginResp` |
 | POST | `/api/logout` | 无 | `null` |
+| POST | `/api/password` | `ChangePasswordReq` | `null` |
 | GET | `/api/me` | 无 | `{ username: string }` |
 
 全新部署通过 `/install` 初始化管理员：`POST /api/install` 使用 `SETUP_TOKEN` 授权，并将管理员密码通过 WebCrypto PBKDF2 哈希后以 `salt:hash` 形式存入 `settings.admin_password`。`INIT_ADMIN_USER`、`INIT_ADMIN_PASSWORD` 和初始化凭据标记仅用于已有旧数据库的升级或凭据恢复：修改兼容变量后，下一次登录会同步更新 D1 中的管理员凭据；后台账号安全修改后的密码不会被未变化的初始化变量覆盖。旧数据库可通过新的 `RESET_ADMIN_CREDENTIALS` 标记执行一次强制重置。
@@ -81,19 +94,23 @@
 | POST | `/api/bookmarks/batch-delete` | `{ ids: number[] }` | `{ deleted: number }` |
 | POST | `/api/bookmarks/sort` | `SortReq` | `null` |
 | POST | `/api/bookmarks/:id/icon-cache/refresh` | 无 | `{ icon_blob: string \| null }` |
+| POST | `/api/bookmarks/check-health` | `{ ids: number[] }` | `{ id, status, ok }[]` |
 
 `POST /api/bookmarks/:id/icon-cache/refresh` 会按当前书签图标和 `icon_source` 刷新可持久化图标缓存：普通 HTTP(S) 图标在短超时时间内尝试写入 `bookmarks.icon_blob` 并返回 data URI，data URI 图标原样写入；Iconify、logo_surf 或非持久化来源会清空或跳过 `icon_blob`。前端只在编辑、保存等显式刷新动作调用该接口；编辑弹窗会先打开，再在后台触发刷新并把返回的 `icon_blob` 同步写入浏览器本地缓存。普通 HTTP(S) 图标抓取超时或失败时接口会尽快返回已有 `icon_blob` 或 `null`，前端可继续使用已保存的原始图标 URL 作为显示兜底。
 
 批量删除请求最多包含 500 个正整数 ID；服务端会去重并忽略已不存在的记录。书签写入可携带 `description_mode: "always" | "hover" | "hidden" | null`；更新时省略该字段会保留原覆盖值，显式 `null` 会恢复跟随全局设置。
+
+`POST /api/bookmarks/check-health` 最多检查请求中的前 20 个书签，Worker 先用 HEAD 请求目标地址，遇到 405、403 或 400 时回退 GET，单个目标超时为 3 秒，返回 HTTP 状态码、`ok`、`timeout` 或 `error`。
 
 ## 图标接口
 
 | 方法 | 路径 | 鉴权 | 说明 |
 | --- | --- | --- | --- |
 | GET | `/api/fetch-favicon?url=` | 登录 | 服务端解析目标站 favicon，失败回退 Google s2 |
+| GET | `/api/iconify-search?query=` | 登录 | 搜索 Iconify 候选并返回预览地址 |
 | GET | `/api/icon/:id` | 无 | 书签图标代理。优先返回 Cloudflare edge cache；cache miss 时一次读取书签图标地址、标题和 D1 中缓存的 `icon_blob`；无 blob 时按书签保存的 HTTP(S) 图标地址服务端抓取并写回 D1；普通 HTTP(S) 外站抓取失败、图标缺失、非 HTTP(S) 值或缓存损坏时返回临时 SVG 文字图标，并带 `X-Icon-Fallback: 1` |
 | GET | `/api/category-icon/:id` | 无 | 分类图标代理。优先返回 Cloudflare edge cache；HTTP(S) 分类图标由 Worker 服务端抓取；外站失败或图标缺失时返回 `no-store` 临时 SVG 文字图标，并带 `X-Icon-Fallback: 1` |
-| GET | `/api/iconify/:set/:name.svg` | 无 | Iconify 图标预览代理。新增/编辑书签弹窗通过该同源代理预览 Iconify 图标，成功响应可被浏览器 Service Worker 与 Cloudflare edge cache 复用；失败时返回 `no-store` 临时 SVG 文字图标，并带 `X-Icon-Fallback: 1` |
+| GET | `/api/iconify/:set/:name.svg` | 无 | Iconify 图标预览代理。新增/编辑书签弹窗通过该同源代理预览，成功响应可被 Cloudflare edge cache 复用；失败时返回 `no-store` 临时 SVG 文字图标，并带 `X-Icon-Fallback: 1` |
 
 图标来源包括：
 
@@ -104,9 +121,9 @@
 - `iconify`：使用 Iconify SVG API，保存格式为 `https://api.iconify.design/{set}/{name}.svg`，例如 `mdi:home` 或 `https://icon-sets.iconify.design/mdi/home/` 会转换为 `https://api.iconify.design/mdi/home.svg`；新增/编辑弹窗会展示 Iconify 候选，候选、手动输入预览和 icon-sets 页面链接都通过 `/api/iconify/{set}/{name}.svg` 代理加载。
 - `custom`：手动填写 URL、表情、纯文字或图床地址。非 URL / 非 data URI 的值会在首页按文本图标直接渲染。
 
-创建或更新书签后，前端会对普通 HTTP(S) 图标显式调用刷新接口，尽量缓存到 `bookmarks.icon_blob`；Iconify 图标和 icon-sets 页面链接不写入 `icon_blob`，后台预览由 `/api/iconify/:set/:name.svg`、Cloudflare edge cache 和同源 Service Worker 缓存复用。更新书签但图标地址或图标来源未改变时不会清空已有 `icon_blob`。首页卡片普通渲染时优先读取聚合数据里的 `icon_blob`，没有内嵌图标时才读取浏览器本地图标缓存；两者都缺失时，可回退使用已保存的普通 HTTP(S) 图标 URL，避免 favicon.im 等可浏览器直连的图标保存后退成文字。普通渲染不主动把 `/api/icon/:id` 挂载到首页 `<img>` 上；只有编辑/保存等显式刷新动作会调用刷新接口。HTTP(S) 分类图片使用 `/api/category-icon/:id?v=...`，data URI、文字和表情分类图标直接渲染；一级标题、二级标签、搜索分组和折叠导航复用相同解析与图片失败回退规则。已保存的 Iconify 书签图标首页可直接使用标准 Iconify SVG URL，并依赖浏览器 HTTP 缓存复用；后台预览仍使用稳定的 `/api/iconify/:set/:name.svg`。
+创建或更新书签后，前端会对普通 HTTP(S) 图标显式调用刷新接口，尽量缓存到 `bookmarks.icon_blob`；Iconify 图标和 icon-sets 页面链接不写入 `icon_blob`，后台预览由 `/api/iconify/:set/:name.svg` 和 Cloudflare edge cache 复用。更新书签但图标地址或图标来源未改变时不会清空已有 `icon_blob`。首页卡片普通渲染时优先读取聚合数据里的 `icon_blob`，没有内嵌图标时才读取浏览器本地图标缓存；两者都缺失时，可回退使用已保存的普通 HTTP(S) 图标 URL，避免 favicon.im 等可浏览器直连的图标保存后退成文字。普通渲染不主动把 `/api/icon/:id` 挂载到首页 `<img>` 上；只有编辑/保存等显式刷新动作会调用刷新接口。HTTP(S) 分类图片使用 `/api/category-icon/:id?v=...`，data URI、文字和表情分类图标直接渲染；一级标题、二级标签、搜索分组和折叠导航复用相同解析与图片失败回退规则。已保存的 Iconify 书签图标首页可直接使用标准 Iconify SVG URL，并依赖浏览器 HTTP 缓存复用；后台预览仍使用稳定的 `/api/iconify/:set/:name.svg`。
 
-前端普通渲染普通 HTTP(S) 书签图标时应先读取聚合数据中的 `icon_blob`，没有内嵌图标时再读取浏览器本地图标缓存，缓存缺失时可使用保存的原始 HTTP(S) 图标 URL 兜底；不要直接把 `/api/icon/:id` 挂载到首页 `<img>`，后台列表仍可把 `/api/icon/:id` 作为兼容预览入口。`/api/icon/:id` 主要作为兼容兜底代理和旧缓存入口保留。持久化的 Iconify 图标首页可使用标准 `https://api.iconify.design/*.svg`，由浏览器 HTTP 缓存复用，避免每个 Iconify 书签都消耗 Worker 请求；后台预览和新增/编辑弹窗仍可规范化为 `/api/iconify/*`。图标缺失、非 HTTP(S) 值或缓存损坏时，代理返回 `no-store` 临时 SVG fallback，不写入长期缓存。Service Worker 对 `/api/icon/*`、`/api/category-icon/*`、`/api/iconify/*` 使用 cache-first 策略，但不会缓存带 `X-Icon-Fallback: 1` 的临时 fallback；对跨域 `https://api.iconify.design/*.svg` 不缓存 `opaque` 响应，并跳过超过 512KB 的图标响应，避免 Cache Storage 膨胀。同一个 Iconify 图标应共享稳定缓存键，不按书签 ID 重复缓存。
+前端普通渲染普通 HTTP(S) 书签图标时应先读取聚合数据中的 `icon_blob`，没有内嵌图标时再读取浏览器本地图标缓存，缓存缺失时可使用保存的原始 HTTP(S) 图标 URL 兜底；不要直接把 `/api/icon/:id` 挂载到首页 `<img>`，后台列表仍可把 `/api/icon/:id` 作为兼容预览入口。`/api/icon/:id` 主要作为兼容兜底代理和旧缓存入口保留。持久化的 Iconify 图标首页可使用标准 `https://api.iconify.design/*.svg`，由浏览器 HTTP 缓存复用，避免每个 Iconify 书签都消耗 Worker 请求；后台预览和新增/编辑弹窗仍可规范化为 `/api/iconify/*`。图标缺失、非 HTTP(S) 值或缓存损坏时，代理返回 `no-store` 临时 SVG fallback，不写入长期缓存。Service Worker 只对 `/api/category-icon/*` 和可读的跨域 `https://api.iconify.design/*.svg` 使用 cache-first；同源 `/api/icon/*` 与 `/api/iconify/*` 由 Worker/浏览器 HTTP 缓存处理，不写入 Cache Storage。Service Worker 不缓存跨域 `opaque` 响应，并跳过超过 512KB 的图标响应，避免 Cache Storage 膨胀。同一个 Iconify 图标应共享稳定缓存键，不按书签 ID 重复缓存。
 
 HTTP(S) 图标抓取成功后，代理会直接返回图片字节并写入 Cloudflare edge cache；只有书签图标需要写入 `bookmarks.icon_blob` 时才生成 base64 data URI，避免 Iconify 预览和分类图标在 Worker 内部做不必要的 base64 编解码。
 
@@ -115,6 +132,16 @@ HTTP(S) 图标抓取成功后，代理会直接返回图片字节并写入 Cloud
 ## 首页搜索行为
 
 首页搜索框输入关键词时直接切换到全站分组搜索结果，不再弹出本地书签下拉选择。匹配字段包括书签标题、URL、描述和完整分类路径。搜索父分类名称可命中后代分类书签；结果保留命中子分类的父级，并只渲染存在匹配内容的分支。按 Enter 仍按当前搜索引擎配置跳转外部搜索。
+
+## 数据导入接口
+
+全部需要登录。
+
+| 方法 | 路径 | 请求 | 返回 |
+| --- | --- | --- | --- |
+| POST | `/api/import` | `ImportReq` | `ImportResp` |
+
+导入支持 `replace` 覆盖和 `merge` 追加合并两种模式；服务端在写入前校验分类深度、父级关系和书签引用，成功后返回导入后的后台聚合数据及分类复用、跳过书签等统计。
 
 ## 设置接口
 

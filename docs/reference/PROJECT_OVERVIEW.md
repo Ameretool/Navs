@@ -17,9 +17,11 @@
 - ✅ 分类自定义图片、data URI、文字和表情图标统一显示在一级标题、二级标签、搜索分组和分类导航中
 - ✅ 左侧导航支持桌面悬停展开或常显、手动收缩偏好记忆；移动端始终使用按钮和抽屉
 - ✅ 顶部导航固定悬浮，受内容区域最大宽度约束；桌面支持箭头和鼠标拖动，移动端支持触摸横向滑动
-- ✅ 首页标题独立展示，支持颜色和文字大小配置
+- ✅ 首页标题独立展示，支持显示开关、颜色和文字大小配置
+- ✅ 首页设置实时预览：未保存的主题、布局、卡片、经常访问区域、页脚 HTML 与自定义 CSS 可在隔离预览中检查
 - ✅ 多搜索引擎快速切换
 - ✅ 首页搜索框按完整分类路径筛选，搜索父级名称可命中后代并保留祖先结构
+- ✅ 首页经常访问区域按点击次数排序，可配置展示数量或关闭
 - ✅ 两种卡片风格（详情/极简）
 - ✅ 详情卡片描述支持始终显示、悬停提示和隐藏，单个书签可覆盖全局策略
 - ✅ 自定义背景（浅色/深色主题分别配置纯色/渐变/图片），并内置 13 组毛玻璃渐变与 9 组护眼纯色方案；护眼方案使用综合色相更明确的浅色前台背景、同色系卡片和可调透明度
@@ -44,6 +46,7 @@
 - ✅ 书签列表搜索筛选
 - ✅ 分类和书签跨分页批量选择、批量删除
 - ✅ 后台书签列表按标题、分类、链接域名和打开方式进行不落盘排序
+- ✅ 访问分析：记录书签点击次数，提供已访问/零访问统计、Top 20 排行和零访问书签分页
 - ✅ 站点设置管理（站点信息、外观与卡片、布局与导航、搜索设置、页脚内容、账号安全六个二级子菜单）；标题内容、颜色和字号集中在站点信息，图床服务位于其“外部资源”子区块
 - ✅ 数据导入导出，支持 CF-Navs、SunPanel JSON 和浏览器书签 HTML 的合并或覆盖
 - ✅ 备份恢复功能
@@ -71,6 +74,8 @@ src/
 │   ├── HomeCategoryScope.svelte # 一级分类标题和分组内二级分类筛选
 │   ├── HomeHeroSearch.svelte # 首页标题和搜索框
 │   ├── SettingsPanel.svelte # 设置面板
+│   ├── settings/            # 设置区块与首页预览
+│   │   └── SettingsHomePreview.svelte # 站点设置的隔离首页预览
 │   ├── admin/          # 后台列表面板与样式
 │   ├── ...
 ├── lib/
@@ -127,7 +132,7 @@ categories (id, parent_id, title, icon, sort, created_at)
 
 -- 书签表
 bookmarks (id, category_id, title, url, icon, icon_source, icon_blob,
-           description, open_method, sort, created_at)
+           description, description_mode, open_method, sort, click_count, created_at)
 ```
 
 ## 📦 主要依赖
@@ -139,8 +144,10 @@ bookmarks (id, category_id, title, url, icon, icon_source, icon_blob,
 - `sortablejs`: ^1.15.3
 
 ### 后端
-- `hono`: ^4.12.27
-- `@cloudflare/workers-types`: ^4.20260702.1
+- `hono`: ^4.13.0
+- `@cloudflare/workers-types`: ^5.20260804.1
+- `vitest`: ^3.2.6
+- `wrangler`: ^4.119.0
 
 ## 🔧 配置说明
 
@@ -149,6 +156,8 @@ bookmarks (id, category_id, title, url, icon, icon_source, icon_blob,
 name = "cf-navs"                    # Worker 名称
 main = "worker/index.ts"            # Worker 入口
 compatibility_date = "2025-06-01"   # 兼容性日期
+compatibility_flags = ["nodejs_compat"]
+keep_vars = true
 
 [[rules]]                           # 将安装 schema 作为文本模块打包
 type = "Text"
@@ -177,13 +186,18 @@ SESSION_TTL = "604800"             # 会话有效期（7天）
 ### package.json 脚本
 ```json
 {
-  "dev": "wrangler dev",            # 启动 Worker 开发服务
-  "dev:web": "vite",                # 启动前端开发服务
-  "build": "vite build",            # 构建前端
+  "dev:web": "vite",
+  "build": "vite build",
   "type-check": "tsc --noEmit && svelte-check",
-  "deploy": "npm run build && wrangler deploy",
-  "db:init": "wrangler d1 execute cf-navs-db --local --file=./schema.sql",
-  "db:init:remote": "wrangler d1 execute cf-navs-db --remote --file=./schema.sql"
+  "test": "vitest run",
+  "perf:audit": "node scripts/perf-audit.mjs",
+  "regression:chrome": "node scripts/chrome-regression.mjs",
+  "setup:wrangler": "node scripts/create-wrangler-local.mjs",
+  "wrangler": "node scripts/wrangler-config.mjs",
+  "dev": "node scripts/wrangler-config.mjs dev",
+  "deploy": "npm run build && node scripts/wrangler-config.mjs deploy",
+  "db:init": "node scripts/wrangler-config.mjs d1 execute DB --local --file=./schema.sql",
+  "db:init:remote": "node scripts/wrangler-config.mjs d1 execute DB --remote --file=./schema.sql"
 }
 ```
 
@@ -323,10 +337,9 @@ docs/
 
 ## 🎯 维护待办
 
-这里只记录已经从当前实现中确认、且尚未完成的维护事项。多语言、多用户、团队协作和数据分析等方向没有当前产品契约，不作为已承诺路线图。
+这里只记录已经从当前实现中确认、且尚未完成的维护事项。多语言、多用户和团队协作等方向没有当前产品契约，不作为已承诺路线图。
 
 - [ ] 为直接刷新 `/admin` 增加真实 Chrome 回归：确认首页不会短暂挂载，并记录控制台错误、页面异常和失败请求。
-- [ ] 下一次生产发布并完成真实浏览器验证后，更新 `docs/screenshots/cf-navs-admin-setting.jpg`；现有截图只作界面示意，不作为当前字段布局契约。
 - [ ] 后续修改认证、CRUD 或弹窗流程时，继续按 use case 缩小 `App.svelte` 的编排职责；每次拆分必须先接入真实调用链并保留现有缓存、路由和回滚行为。
 - [ ] 只有在接近真实规模的数据证明 DOM 数量或交互耗时成为瓶颈后，才评估长列表虚拟化，并记录改动前后的指标。
 

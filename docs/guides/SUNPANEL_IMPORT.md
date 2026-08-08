@@ -156,7 +156,7 @@ node scripts/convert-sunpanel.cjs SunPanel-Data.json cf-navs-import.json
 ### Q: 可以导入到已有数据的 CF-Navs 吗？
 
 **A:** 可以，但：
-- 导入会覆盖现有数据（慎重操作）
+- 可在导入时选择“追加合并”或“覆盖现有数据”；只有选择覆盖时才会清空现有分类和书签
 - 建议先导出当前数据备份
 
 ### Q: 导入失败怎么办？
