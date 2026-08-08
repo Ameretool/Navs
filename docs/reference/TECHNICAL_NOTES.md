@@ -54,7 +54,13 @@ https://api.iconify.design/{set}/{name}.svg
 - `@iconify-icons/*`
 - `https://icon-sets.iconify.design/...`
 
-新增/编辑弹窗和后台预览会使用同源 `/api/iconify/*` 代理，便于 Cloudflare edge cache 和同源 Service Worker 缓存复用同一份图标资源。首页展示持久化 Iconify 图标时可直接使用 `https://api.iconify.design/*.svg`，依赖浏览器 HTTP 缓存复用，避免把每个 Iconify 书签都变成 Worker 请求。Service Worker 不持久化跨域 `opaque` 响应，避免小 SVG 在 Cache Storage 中被浏览器按大配额填充。
+新增/编辑弹窗和后台预览会使用同源 `/api/iconify/*` 代理，便于 Cloudflare edge cache 复用同一份图标资源。首页展示持久化 Iconify 图标时可直接使用 `https://api.iconify.design/*.svg`，依赖浏览器 HTTP 缓存复用，避免把每个 Iconify 书签都变成 Worker 请求；Service Worker 只缓存可读且不超过 512KB 的跨域响应，不持久化 `opaque` 响应，避免小 SVG 在 Cache Storage 中被浏览器按大配额填充。
+
+## 首页设置预览与访问分析
+
+`SettingsHomePreview.svelte` 接收设置表单归一化后的当前值，使用固定的示例分类和书签复用首页标题、搜索、卡片和背景渲染逻辑。预览支持浅色/深色切换，并将自定义 CSS 与页脚 HTML 放入带严格 CSP 的隔离文档；预览容器使用 `inert`，不读取真实数据、不执行脚本，也不触发保存或公开访问副作用，因此只能作为未保存配置的视觉检查。
+
+首页打开书签时通过 `POST /api/public/bookmarks/:id/click` 累计点击次数。Worker 以 IP 与书签 ID 为粒度在 10 分钟内最多计数 3 次，点击计数不更新 `data_version`，避免让公开首页缓存整体失效。后台切换到“访问分析”标签时由外层强制刷新 `/api/admin/data`，分析面板在客户端计算总点击、已访问书签、Top 20 和零访问书签分页。
 
 ## 描述显示策略
 
