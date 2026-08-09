@@ -1,9 +1,18 @@
 :root {
   font-family: Inter, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
   color: #e5eefb;
-  background:
+  --home-background:
     radial-gradient(circle at top, rgba(59, 130, 246, 0.22), transparent 40%),
     linear-gradient(180deg, #0f172a 0%, #111827 100%);
+  --home-background-mask: 0;
+  --home-background-mask-color: #000000;
+  background:
+    linear-gradient(
+      color-mix(in srgb, var(--home-background-mask-color) calc(var(--home-background-mask) * 100%), transparent),
+      color-mix(in srgb, var(--home-background-mask-color) calc(var(--home-background-mask) * 100%), transparent)
+    ),
+    var(--home-background);
+  background-attachment: fixed;
 }
 
 html,

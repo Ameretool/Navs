@@ -203,6 +203,7 @@ npx wrangler d1 execute cf-navs-db --remote --command "SELECT key, value FROM se
 - `curl` 在 PowerShell 中拼 JSON 登录体容易引号转义失败，建议用 Node `fetch` 或页面上下文 `fetch`。
 - 右键菜单验证使用 CDP `Input.dispatchMouseEvent` 的 right button 事件，比直接 `dispatchEvent` 更接近真实操作。
 - 验证完成后只清理本次启动并记录了精确 profile 的 Chrome 进程。不要使用按进程名关闭全部 Chrome 的命令。
+- 移动端背景边界验证使用约 `390x844` 的视口，分别检查初始位置、页面中段和 `scrollY = scrollHeight - innerHeight` 的底部位置；渐变和背景图片都必须覆盖视口，不能在顶部或底部出现白色根画布。检查 `html` 根节点的首页背景变量是否与当前主题一致，并同时记录控制台错误、页面异常和失败请求。
 
 常规验收项：
 
