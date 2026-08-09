@@ -10,4 +10,15 @@ describe('home responsive layout', () => {
     expect(mobileStyles).toContain('padding: 1rem 1rem var(--content-margin-bottom, 0%);')
     expect(mobileStyles).not.toContain('var(--content-margin-x')
   })
+  it('paints mobile overscroll with the active homepage background', () => {
+    const app = readFileSync('src/App.svelte', 'utf8')
+    const globalStyles = readFileSync('src/app.css', 'utf8')
+
+    expect(app).toContain("'--home-background'")
+    expect(app).toContain("'--home-background-mask'")
+    expect(app).toContain("'--home-background-mask-color'")
+    expect(app).toContain('document.documentElement.style.setProperty')
+    expect(globalStyles).toContain('var(--home-background);')
+    expect(globalStyles).toContain('background-attachment: fixed;')
+  })
 })

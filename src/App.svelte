@@ -87,6 +87,11 @@
   } from './lib/dataService'
 
   type SettingsSubset = SettingsFormValue
+  const ROOT_HOME_BACKGROUND_PROPERTIES = [
+    '--home-background',
+    '--home-background-mask',
+    '--home-background-mask-color',
+  ]
 
   let booting = true
   let installState: InstallScreenState = { type: 'checking' }
@@ -199,6 +204,13 @@
   $: if (typeof document !== 'undefined') {
     document.documentElement.dataset.theme = activeTheme
     document.documentElement.dataset.backgroundPreset = publicData?.settings.background_preset_id ?? 'custom'
+
+    // Mobile overscroll exposes the root canvas outside the fixed homepage layers.
+    const parsedHomeBackground = document.createElement('div').style
+    parsedHomeBackground.cssText = homeBackgroundStyle
+    for (const property of ROOT_HOME_BACKGROUND_PROPERTIES) {
+      document.documentElement.style.setProperty(property, parsedHomeBackground.getPropertyValue(property))
+    }
 
     // OD-01: Custom CSS injection
     let styleTag = document.getElementById('custom-css-inject');
