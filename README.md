@@ -96,8 +96,8 @@ CF-Navs 需要以下 Cloudflare 资源：
   <img src="docs/screenshots/cf-deploy3.jpg" alt="在 Cloudflare Worker 中添加 SETUP_TOKEN 密钥" width="100%">
 </p>
 
-5. 首轮部署完成后，在 Worker 的 **设置 → 变量和密钥** 中选择**生产环境**，手动添加类型为**密钥**的 `SETUP_TOKEN`，值使用足够长的随机字符串。不要把它添加为普通文本变量。
-6. 保存 Secret 后重新触发生产分支部署，再访问 `https://你的站点/install`，输入 `SETUP_TOKEN`，再创建管理员用户名和密码。
+5. 首轮部署完成后，在 Worker 的 **设置 → 变量和密钥** 中，手动添加类型为**密钥**的 `SETUP_TOKEN`，值使用足够长的随机字符串。不要把它添加为普通文本变量。( **注意：** 如果已经存在`SETUP_TOKEN`，请编辑一下修改密钥值，然后在 **设置** 页面下面 **构建** 中 **清理缓存** )
+6. 保存 Secret 后重新触发生产分支部署，再访问 `https://你的站点/install`，Ctrl+F5强制刷新页面，输入上一步 `SETUP_TOKEN`的值，再创建管理员用户名和密码。
 7. 确认安装和登录成功后，删除或轮换 `SETUP_TOKEN`。
 
 > Cloudflare Git 会根据 [`wrangler.toml`](wrangler.toml) 中不带资源 ID 的声明创建并绑定 `DB` 与 `SESSION`。`SETUP_TOKEN` 不属于 GitHub 导入器的自动初始化参数。如果导入页面或旧 Worker 中出现自动生成的 `SETUP_TOKEN` 普通变量，请删除它，再按上面的步骤手动创建生产环境 Secret。已有 Fork 应使用 **Import a repository**，不要使用会新建仓库的通用 Deploy Button。
