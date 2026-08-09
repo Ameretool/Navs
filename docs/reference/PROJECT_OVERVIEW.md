@@ -159,9 +159,6 @@ compatibility_date = "2025-06-01"   # 兼容性日期
 compatibility_flags = ["nodejs_compat"]
 keep_vars = true
 
-[secrets]
-required = ["SETUP_TOKEN"]          # 首次安装必需的生产 Secret
-
 [[rules]]                           # 将安装 schema 作为文本模块打包
 type = "Text"
 globs = ["**/schema.sql"]
@@ -324,8 +321,8 @@ SESSION_TTL = "604800"             # 会话有效期（7天）
 
 ### 生产环境
 
-- **Cloudflare Git（推荐新安装）**：Fork 仓库后在 Dashboard 使用 **Import a repository** 选择现有 Fork；通用 Deploy Button 只能创建新仓库。保留无 ID 的 `DB`/`SESSION` 声明，让 Git 引导流程创建绑定；添加加密 `SETUP_TOKEN`，部署后访问 `/install` 初始化 schema 和管理员。确认安装成功后建议删除或轮换该 Secret；公开状态检查不依赖它，安装锁由 D1 中的管理员凭据和完成标记判定。正常路径不需要 API Token、GitHub Actions 或手动 SQL。
-- **Wrangler CLI**：创建 D1/KV，运行 `npm run setup:wrangler`，设置加密 Secret `SETUP_TOKEN`，运行 `npm run deploy`，再访问 `/install` 初始化 schema 和管理员。`db:init:remote` 仅用于安装器失败后的恢复。
+- **Cloudflare Git（推荐新安装）**：Fork 仓库后在 Dashboard 使用 **Import a repository** 选择现有 Fork；通用 Deploy Button 只能创建新仓库。保留无 ID 的 `DB`/`SESSION` 声明，让 Git 引导流程首轮创建绑定；首轮部署后添加加密 `SETUP_TOKEN` 并重新部署，再访问 `/install` 初始化 schema 和管理员。确认安装成功后建议删除或轮换该 Secret；公开状态检查不依赖它，安装锁由 D1 中的管理员凭据和完成标记判定。正常路径不需要 API Token、GitHub Actions 或手动 SQL。
+- **Wrangler CLI**：创建 D1/KV，运行 `npm run setup:wrangler`，先运行 `npm run deploy` 创建 Worker，再设置加密 Secret `SETUP_TOKEN` 并重新运行 `npm run deploy`，最后访问 `/install` 初始化 schema 和管理员。`db:init:remote` 仅用于安装器失败后的恢复。
 - `/install` 自动初始化失败时，才在 D1 SQL Console 执行 `schema.sql` 作为恢复手段。
 
 ## 📚 文档结构
