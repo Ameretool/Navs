@@ -14,6 +14,7 @@
 //   CHROME_EXE="C:\Program Files\Google\Chrome\Application\chrome.exe"
 //   CHROME_PROFILE_ROOT=<parent directory for the temporary profile; defaults to the OS temp dir>
 //   CHROME_USER_DATA_DIR=<full profile path; must end with cf-navs-chrome-profile-<id>>
+//   CHROME_NO_SANDBOX=1  # only for an isolated temporary browser in restricted environments
 //   REGRESSION_ALLOW_EXISTING_CHROME=1  # opt in only for a dedicated existing test browser
 //   REGRESSION_FORCE_TEMP_CHROME=1
 //   REGRESSION_ALLOW_FAILURES=1
@@ -40,6 +41,7 @@ const CHROME_USER_DATA_DIR =
 const SAFE_TEMP_PROFILE = /^cf-navs-chrome-profile-[a-z0-9_-]+$/i.test(path.basename(path.resolve(CHROME_USER_DATA_DIR)))
 const ADMIN_USER = process.env.ADMIN_USER || ''
 const ADMIN_PASS = process.env.ADMIN_PASS || ''
+const CHROME_NO_SANDBOX = process.env.CHROME_NO_SANDBOX === '1'
 const ALLOW_EXISTING_CHROME = process.env.REGRESSION_ALLOW_EXISTING_CHROME === '1'
 const FORCE_TEMP_CHROME = process.env.REGRESSION_FORCE_TEMP_CHROME === '1'
 const ALLOW_FAILURES = process.env.REGRESSION_ALLOW_FAILURES === '1'
@@ -145,14 +147,17 @@ async function ensureChrome() {
   browserStartedByTest = true
   browserConnectionMode = 'isolated-temp-browser'
 
-  browserProcess = spawn(CHROME_EXE, [
+  const chromeArguments = [
     '--headless=new',
     '--disable-gpu',
     '--remote-debugging-port=0',
     '--remote-allow-origins=*',
     `--user-data-dir=${CHROME_USER_DATA_DIR}`,
     'about:blank',
-  ], {
+  ]
+  if (CHROME_NO_SANDBOX) chromeArguments.push('--no-sandbox')
+
+  browserProcess = spawn(CHROME_EXE, chromeArguments, {
     detached: false,
     stdio: 'ignore',
     windowsHide: true,
@@ -169,7 +174,10 @@ async function ensureChrome() {
     await sleep(250)
   }
 
-  throw new Error(`Chrome did not expose CDP from its owned profile ${CHROME_USER_DATA_DIR}`)
+  throw new Error(
+    `Chrome did not expose CDP from its owned profile ${CHROME_USER_DATA_DIR}` +
+    (browserProcess.exitCode !== null ? ` (launcher exit code: ${browserProcess.exitCode})` : ''),
+  )
 }
 
 async function readDevToolsActivePort() {

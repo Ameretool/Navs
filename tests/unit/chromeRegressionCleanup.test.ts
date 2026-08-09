@@ -27,6 +27,8 @@ describe('Chrome regression cleanup', () => {
     expect(source).toContain('REGRESSION_CLEAR_ORIGIN_DATA is only allowed for an isolated browser started by this regression run')
     expect(source).toContain("await mkdir(CHROME_USER_DATA_DIR)")
     expect(source).toContain("'--remote-debugging-port=0'")
+    expect(source).toContain("const CHROME_NO_SANDBOX = process.env.CHROME_NO_SANDBOX === '1'")
+    expect(source).toContain("if (CHROME_NO_SANDBOX) chromeArguments.push('--no-sandbox')")
     expect(source).not.toContain('.Contains($profile')
     expect(source).not.toContain('startedChrome')
     expect(source).not.toContain('chromeProcess')
