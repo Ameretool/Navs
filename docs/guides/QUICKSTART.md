@@ -38,20 +38,28 @@ npx wrangler kv namespace create SESSION
 npm run setup:wrangler
 ```
 
-### 4. 设置一次性安装令牌
+### 4. 首次部署
+
+```bash
+npm run deploy
+```
+
+- 首轮部署完成后再设置 Secret；Worker 尚未创建时，不能用 `wrangler secret put` 提前写入。
+
+### 5. 设置一次性安装令牌
 
 ```bash
 npx wrangler secret put SETUP_TOKEN
 # 输入足够长的随机值，并安全保存到完成安装
 ```
 
-### 5. 部署
+### 6. Secret 生效后重新部署
 
 ```bash
 npm run deploy
 ```
 
-### 6. 完成安装
+### 7. 完成安装
 
 访问返回的 Workers URL 并打开 `/install`，输入 `SETUP_TOKEN`，再创建管理员用户名和密码。安装器会初始化数据库 schema；确认登录成功后，建议删除或轮换 `SETUP_TOKEN`。
 
@@ -75,14 +83,15 @@ npm run deploy
 npx wrangler deploy
 ```
 
-4. 在该 Worker 的 **设置 → 变量和密钥** 中，选择**生产环境**，添加一个类型为**密钥**的变量，变量名填写 `SETUP_TOKEN`，值填写一段足够长且随机的字符串。仓库的 `wrangler.toml` 已声明该 Secret 为必需项；如果生产环境没有它，部署会被拒绝。
+4. 保存并完成首轮生产部署。Cloudflare 的 Git 引导流程会根据 `wrangler.toml` 中不带 ID 的声明创建并绑定 `DB` D1 数据库与 `SESSION` KV 命名空间。
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/lbjxr/CF-Navs/main/docs/screenshots/cf-deploy3.jpg" alt="在 Cloudflare Worker 中添加 SETUP_TOKEN 密钥" width="100%">
 </p>
 
-5. 保存 Secret 后重新触发生产分支部署。打开部署后的 Workers URL，并访问 `/install`。输入 `SETUP_TOKEN`，再设置管理员用户名和密码；安装器会初始化数据库 schema 和管理员账号。
-6. 进入该 Worker 的 **域和路由** 页面，关闭两个 Workers URL，然后添加并启用你的自定义域名。
+5. 首轮部署完成后，在该 Worker 的 **设置 → 变量和密钥** 中选择**生产环境**，添加一个类型为**密钥**的变量，变量名填写 `SETUP_TOKEN`，值填写一段足够长且随机的字符串。
+6. 保存 Secret 后重新触发生产分支部署。打开部署后的 Workers URL，并访问 `/install`。输入 `SETUP_TOKEN`，再设置管理员用户名和密码；安装器会初始化数据库 schema 和管理员账号。
+7. 进入该 Worker 的 **域和路由** 页面，关闭两个 Workers URL，然后添加并启用你的自定义域名。
 
 `package.json` 的 Cloudflare Git 元数据只声明 D1/KV 资源，不声明 `SETUP_TOKEN` 或旧版恢复 Secret，因此 GitHub 导入不会自动生成或填充 Secret 参数。正常路径无需 Cloudflare API Token、GitHub Actions 或手动 SQL；只有安装器报 schema 初始化错误时，才在 D1 SQL Console 执行 [schema.sql](../../schema.sql) 进行恢复。首次部署请从生产分支 `main` 触发，资源创建完成前不要使用预览分支自动部署。
 
