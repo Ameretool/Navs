@@ -81,7 +81,7 @@ CF-Navs 需要以下 Cloudflare 资源：
 |---|---|---|
 | D1 Database | `DB` | 保存设置、分类和书签 |
 | KV Namespace | `SESSION` | 保存管理员会话 |
-| Secret | `SETUP_TOKEN` | 授权首次安装 |
+| Secret | `SETUP_TOKEN` | 手动配置，授权首次安装 |
 
 ### 方式一：Cloudflare 控制台部署
 
@@ -90,7 +90,7 @@ CF-Navs 需要以下 Cloudflare 资源：
 1. [Fork 本仓库](https://github.com/lbjxr/CF-Navs/fork)。
 2. 在 Cloudflare 控制台打开 **Workers & Pages → Create application → Import a repository**，选择你 Fork 后的仓库。
 3. 将生产分支设为 `main`，Build command 填写 `npm run build`，Deploy command 填写 `npx wrangler deploy`。
-4. 在 Worker 的 **设置 → 变量和密钥** 中选择**生产环境**，添加加密 Secret `SETUP_TOKEN`，值使用足够长的随机字符串。`wrangler.toml` 将它声明为必需 Secret；生产环境未配置时部署会被拒绝。
+4. 在 Worker 的 **设置 → 变量和密钥** 中选择**生产环境**，手动添加类型为**密钥**的 `SETUP_TOKEN`，值使用足够长的随机字符串。不要把它添加为普通文本变量。`wrangler.toml` 将它声明为必需 Secret；生产环境未配置时部署会被拒绝。
 
 <p align="center">
   <img src="docs/screenshots/cf-deploy3.jpg" alt="在 Cloudflare Worker 中添加 SETUP_TOKEN 密钥" width="100%">
@@ -99,7 +99,7 @@ CF-Navs 需要以下 Cloudflare 资源：
 5. 保存 Secret 后重新触发生产分支部署，再访问 `https://你的站点/install`，输入 `SETUP_TOKEN`，再创建管理员用户名和密码。
 6. 确认安装和登录成功后，删除或轮换 `SETUP_TOKEN`。
 
-> Cloudflare Git 会根据 [`wrangler.toml`](wrangler.toml) 中不带资源 ID 的声明创建并绑定 `DB` 与 `SESSION`。`SETUP_TOKEN` 不属于 GitHub 导入器的自动初始化参数，必须在 Worker 的生产环境中手动添加为 Secret。已有 Fork 应使用 **Import a repository**，不要使用会新建仓库的通用 Deploy Button。
+> Cloudflare Git 会根据 [`wrangler.toml`](wrangler.toml) 中不带资源 ID 的声明创建并绑定 `DB` 与 `SESSION`。`SETUP_TOKEN` 不属于 GitHub 导入器的自动初始化参数。如果导入页面或旧 Worker 中出现自动生成的 `SETUP_TOKEN` 普通变量，请删除它，再按上面的步骤手动创建生产环境 Secret。已有 Fork 应使用 **Import a repository**，不要使用会新建仓库的通用 Deploy Button。
 
 > Cloudflare Git 的 Deploy command 应使用 `npx wrangler deploy`。`npm run deploy` 会读取本地生成的 `wrangler.local.toml`，只适合本地 Wrangler CLI 部署。
 
