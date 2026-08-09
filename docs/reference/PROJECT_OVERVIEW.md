@@ -159,6 +159,9 @@ compatibility_date = "2025-06-01"   # 兼容性日期
 compatibility_flags = ["nodejs_compat"]
 keep_vars = true
 
+[secrets]
+required = ["SETUP_TOKEN"]          # 首次安装必需的生产 Secret
+
 [[rules]]                           # 将安装 schema 作为文本模块打包
 type = "Text"
 globs = ["**/schema.sql"]

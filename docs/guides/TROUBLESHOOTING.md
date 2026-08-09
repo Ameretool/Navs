@@ -28,10 +28,12 @@ npm run build && npx wrangler deploy
 
 ### `/install` 提示安装令牌无效
 
-1. 确认 Worker 的 **设置 → 变量和密钥** 中存在类型为**密钥**的变量 `SETUP_TOKEN`，名称大小写完全一致。
-2. 确认输入值没有前后空格；如果修改了密钥，请等待 Cloudflare 保存完成后重新打开 `/install` 检查。
-3. 不要把管理员密码填到 `SETUP_TOKEN`；安装令牌仅用于授权一次安装，管理员密码在 `/install` 页面另行设置。
-4. 如果站点已经安装完成，则不再需要 `SETUP_TOKEN`。`GET /api/install/status` 可公开检查安装状态，删除 Secret 不影响运行；后续安装请求仍会被永久拒绝。
+1. 确认当前访问的域名属于正在部署的同一个 Worker，不是另一个 Worker、Pages 项目或旧的自定义域名路由。
+2. 确认 Worker 的 **设置 → 变量和密钥** 中选择的是**生产环境**，存在类型为**密钥**的变量 `SETUP_TOKEN`，名称大小写完全一致；预览环境的 Secret 不会自动提供给生产流量。
+3. GitHub 导入器不应自动生成 `SETUP_TOKEN` 参数；该名称不在 `package.json` 的 Cloudflare 资源元数据中，必须手动创建为 Secret。保存或修改 Secret 后，重新触发 `main` 生产分支部署。仓库 `wrangler.toml` 已声明 `secrets.required = ["SETUP_TOKEN"]`；如果部署日志没有提示缺少 Secret，却仍返回 `setup_token_missing`，优先检查部署目标和访问域名是否一致。
+4. 确认输入值没有前后空格；不要把管理员密码填到 `SETUP_TOKEN`。安装令牌仅用于授权一次安装，管理员密码在 `/install` 页面另行设置。
+5. 可直接请求 `GET /api/install/status` 检查运行时状态：返回 `needs_install` 表示 Worker 已读到 Secret；返回 `configuration_required` / `setup_token_missing` 表示当前处理请求的 Worker 环境没有读到 Secret。
+6. 如果站点已经安装完成，则不再需要 `SETUP_TOKEN`。安装状态检查不要求令牌，删除 Secret 不影响运行；后续安装请求仍会被永久拒绝。
 
 ### `/install` 提示数据库初始化失败
 

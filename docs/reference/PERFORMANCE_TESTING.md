@@ -53,6 +53,15 @@ $env:ADMIN_PASS = '<admin password>'
 npm run regression:chrome
 ```
 
+受管 Windows 环境如果隔离无头 Chrome 启动后无法保持 CDP 端口，可仅对本次临时 profile 显式启用：
+
+```powershell
+$env:CHROME_NO_SANDBOX = '1'
+npm run regression:chrome
+```
+
+该选项只适用于脚本创建的临时 profile，不要用于用户已有浏览器或默认 profile。脚本仍以临时 profile 的 `DevToolsActivePort` 为启动成功条件，并在退出时按完整 profile 路径清理进程。
+
 By default `regression:chrome` starts a temporary Chrome profile under the operating system temporary directory, named `cf-navs-chrome-profile-<port>`. Its `finally` cleanup closes the test-owned browser, stops only Chrome processes matching that exact profile, verifies the remaining process count is zero, and then removes the profile.
 
 When Chrome is already running with a dynamic DevTools port, the script can connect through the browser websocket only if `REGRESSION_ALLOW_EXISTING_CHROME=1` and `CHROME_DEVTOOLS_ACTIVE_PORT_FILE` are set for a browser dedicated to this test. In that mode the JSON output reports `browserConnectionMode: "dedicated-existing-browser"` and does not start a temporary Chrome process. The helper `scripts/discover-devtools.ps1` never scans the default Chrome profile; existing-browser discovery requires an explicit active-port file and opt-in switch.
