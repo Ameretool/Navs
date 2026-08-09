@@ -30,12 +30,6 @@
       },
       "SESSION": {
         "description": "KV namespace for HttpOnly administrator sessions; the installer also verifies this required binding before setup."
-      },
-      "SETUP_TOKEN": {
-        "description": "One-time encrypted secret required to authorize POST /api/install initialization of the database and administrator."
-      },
-      "INIT_ADMIN_PASSWORD": {
-        "description": "Legacy upgrade/recovery bootstrap secret. New Cloudflare Git and Wrangler CLI deployments use SETUP_TOKEN and /install instead."
       }
     }
   },

@@ -84,7 +84,7 @@ npx wrangler deploy
 5. 保存 Secret 后重新触发生产分支部署。打开部署后的 Workers URL，并访问 `/install`。输入 `SETUP_TOKEN`，再设置管理员用户名和密码；安装器会初始化数据库 schema 和管理员账号。
 6. 进入该 Worker 的 **域和路由** 页面，关闭两个 Workers URL，然后添加并启用你的自定义域名。
 
-正常路径无需 Cloudflare API Token、GitHub Actions 或手动 SQL；只有安装器报 schema 初始化错误时，才在 D1 SQL Console 执行 [schema.sql](../../schema.sql) 进行恢复。首次部署请从生产分支 `main` 触发，资源创建完成前不要使用预览分支自动部署。
+`package.json` 的 Cloudflare Git 元数据只声明 D1/KV 资源，不声明 `SETUP_TOKEN` 或旧版恢复 Secret，因此 GitHub 导入不会自动生成或填充 Secret 参数。正常路径无需 Cloudflare API Token、GitHub Actions 或手动 SQL；只有安装器报 schema 初始化错误时，才在 D1 SQL Console 执行 [schema.sql](../../schema.sql) 进行恢复。首次部署请从生产分支 `main` 触发，资源创建完成前不要使用预览分支自动部署。
 
 ## 🔑 首次登录
 

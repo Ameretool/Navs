@@ -24,7 +24,7 @@
 5. 保存 Secret 后重新触发生产分支部署。打开部署后的 Workers URL，并访问 `/install`。输入 `SETUP_TOKEN`，再设置管理员用户名和密码；安装器会初始化数据库 schema 和管理员账号。
 6. 进入该 Worker 的 **域和路由** 页面，关闭两个 Workers URL，然后添加并启用你的自定义域名。
 
-> 正常在线安装不需要 Cloudflare API Token、GitHub Actions 或手动 SQL。只有 `/install` 报 schema 初始化错误时，才在 D1 SQL Console 执行一次 [schema.sql](../../schema.sql) 作为恢复步骤。
+> `package.json` 的 Cloudflare Git 元数据只声明 D1/KV 资源，不声明 `SETUP_TOKEN` 或旧版恢复 Secret，因此 GitHub 导入不会自动生成或填充 Secret 参数。正常在线安装不需要 Cloudflare API Token、GitHub Actions 或手动 SQL。只有 `/install` 报 schema 初始化错误时，才在 D1 SQL Console 执行一次 [schema.sql](../../schema.sql) 作为恢复步骤。
 
 > 在线部署命令不要使用 `npm run deploy`：该命令读取本地生成的 `wrangler.local.toml`，适用于 Wrangler CLI 部署。Git 自动部署请使用 Build command `npm run build` 和 Deploy command `npx wrangler deploy`，然后通过 `/install` 完成初始化。
 
