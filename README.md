@@ -90,13 +90,13 @@ CF-Navs 需要以下 Cloudflare 资源：
 1. [Fork 本仓库](https://github.com/lbjxr/CF-Navs/fork)。
 2. 在 Cloudflare 控制台打开 **Workers & Pages → Create application → Import a repository**，选择你 Fork 后的仓库。
 3. 将生产分支设为 `main`，Build command 填写 `npm run build`，Deploy command 填写 `npx wrangler deploy`。
-4. 首次部署完成后，在 Worker 的 **设置 → 变量和密钥** 中添加加密 Secret `SETUP_TOKEN`，值使用足够长的随机字符串。
+4. 在 Worker 的 **设置 → 变量和密钥** 中选择**生产环境**，添加加密 Secret `SETUP_TOKEN`，值使用足够长的随机字符串。`wrangler.toml` 将它声明为必需 Secret；生产环境未配置时部署会被拒绝。
 
 <p align="center">
   <img src="docs/screenshots/cf-deploy3.jpg" alt="在 Cloudflare Worker 中添加 SETUP_TOKEN 密钥" width="100%">
 </p>
 
-5. 访问 `https://你的站点/install`，输入 `SETUP_TOKEN`，再创建管理员用户名和密码。
+5. 保存 Secret 后重新触发生产分支部署，再访问 `https://你的站点/install`，输入 `SETUP_TOKEN`，再创建管理员用户名和密码。
 6. 确认安装和登录成功后，删除或轮换 `SETUP_TOKEN`。
 
 > Cloudflare Git 会根据 [`wrangler.toml`](wrangler.toml) 中不带资源 ID 的声明创建并绑定 `DB` 与 `SESSION`。已有 Fork 应使用 **Import a repository**，不要使用会新建仓库的通用 Deploy Button。

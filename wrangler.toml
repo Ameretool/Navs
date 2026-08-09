@@ -4,6 +4,10 @@ compatibility_date = "2025-06-01"
 compatibility_flags = ["nodejs_compat"]
 keep_vars = true
 
+[secrets]
+# Cloudflare Git/Wrangler must inherit this runtime Secret and reject a deployment when it is missing.
+required = ["SETUP_TOKEN"]
+
 # 将安装器使用的 schema.sql 作为文本模块打包进 Worker。
 [[rules]]
 type = "Text"
