@@ -264,16 +264,40 @@
     }
 
     .import-actions {
-      justify-content: flex-start;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      grid-template-areas:
+        "source source"
+        "mode button";
+      align-items: end;
+      width: 100%;
+      flex: none;
+      gap: 10px;
     }
 
     .import-source-field {
-      flex: 1 1 180px;
+      min-width: 0;
+      width: 100%;
     }
 
-    .primary-button,
-    .ghost-button {
-      align-self: flex-start;
+    .import-source-field:first-child {
+      grid-area: source;
     }
+
+    .import-source-field:nth-child(2) {
+      grid-area: mode;
+    }
+
+    .import-actions > .ghost-button {
+      grid-area: button;
+      align-self: stretch;
+      min-width: 0;
+      width: 100%;
+      padding-left: 8px;
+      padding-right: 8px;
+      white-space: nowrap;
+    }
+
+    .primary-button { align-self: flex-start; }
   }
 </style>

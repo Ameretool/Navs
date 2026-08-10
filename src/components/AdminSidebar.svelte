@@ -162,11 +162,13 @@
   @media (max-width: 700px) {
     .admin-sidebar {
       position: fixed;
+      top: auto;
       bottom: 0;
       left: 0;
       right: 0;
       width: 100% !important;
       height: 60px;
+      box-sizing: border-box;
       flex-direction: row;
       justify-content: space-around;
       align-items: center;
@@ -175,7 +177,7 @@
       border-right: none;
       border-bottom: none;
       z-index: 999;
-      padding: 4px 8px;
+      padding: 4px 8px max(4px, env(safe-area-inset-bottom));
       margin: 0;
       box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08);
     }

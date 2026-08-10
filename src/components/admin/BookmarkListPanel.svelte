@@ -15,6 +15,7 @@
     reorderAdminSortDraft,
   } from '../../lib/adminListState'
   import { getBookmarkFallbackIcon, getBookmarkIconUrl, hasBookmarkImageIcon } from '../../lib/bookmarkIconDisplay'
+  import { truncateUnicodeText } from '../../lib/truncateUnicodeText'
   import { sortableList, type SortHandler } from '../../lib/sortableList'
   import CachedBookmarkIcon from '../CachedBookmarkIcon.svelte'
   import './adminListPanels.css'
@@ -230,12 +231,12 @@
         <div class="admin-table-wrap">
           <table class="admin-bookmark-table" class:is-sorting={sortMode}>
             <colgroup>
-              <col style="width: 44px;" />
-              <col style="width: 30%;" />
-              <col style="width: 50%;" />
-              <col style="width: 12%;" />
-              <col style="width: 8%;" />
-              {#if !sortMode}<col style="width: 122px;" />{/if}
+              <col class="col-selection" style="width: 44px;" />
+              <col class="col-title" style="width: 30%;" />
+              <col class="col-url" style="width: 50%;" />
+              <col class="col-category" style="width: 12%;" />
+              <col class="col-open-method" style="width: 8%;" />
+              {#if !sortMode}<col class="col-actions" style="width: 122px;" />{/if}
             </colgroup>
             <thead>
               <tr>
@@ -287,8 +288,26 @@
                           {getBookmarkFallbackIcon(bookmark)}
                         {/if}
                       </span>
-                      <div>
-                        <strong>{bookmark.title}</strong>
+                      <div class="admin-bookmark-info">
+                        <strong title={bookmark.title} aria-label={bookmark.title}>
+                          <span class="admin-bookmark-title-full">{bookmark.title}</span>
+                          <span class="admin-bookmark-title-mobile" aria-hidden="true">{truncateUnicodeText(bookmark.title, 12)}</span>
+                        </strong>
+                        <div class="admin-bookmark-meta">
+                          <span class="admin-bookmark-category">{getCategoryTitle(bookmark.category_id)}</span>
+                          <span class="admin-bookmark-method">{bookmark.open_method === 'same_tab' ? '当前标签页' : bookmark.open_method === 'modal' ? '当前页弹层' : '新标签页'}</span>
+                        </div>
+                        <a href={bookmark.url} target="_blank" rel="noreferrer" class="admin-bookmark-mobile-url" title={bookmark.url} aria-label={`打开 ${bookmark.url}`}>
+                          {truncateUnicodeText(bookmark.url, 20)}
+                        </a>
+                        {#if healthResults.has(Number(bookmark.id))}
+                          {@const mobileResult = healthResults.get(Number(bookmark.id))}
+                          {#if mobileResult && mobileResult.ok}
+                            <span class="health-badge ok admin-bookmark-mobile-health">200 OK</span>
+                          {:else if mobileResult}
+                            <span class="health-badge error admin-bookmark-mobile-health" title={`连接错误: ${mobileResult.status}`}>{mobileResult.status}</span>
+                          {/if}
+                        {/if}
                         {#if bookmark.description}
                           <p>{bookmark.description}</p>
                         {/if}
@@ -492,6 +511,24 @@
     text-align: left;
   }
 
+  .admin-bookmark-info {
+    min-width: 0;
+  }
+
+  .admin-bookmark-info > strong {
+    display: block;
+  }
+
+  .admin-bookmark-title-mobile {
+    display: none;
+  }
+
+  .admin-bookmark-meta,
+  .admin-bookmark-mobile-url,
+  .admin-bookmark-mobile-health {
+    display: none;
+  }
+
   .admin-bookmark-cell p {
     color: var(--admin-subtle);
     line-height: 1.5;
@@ -530,6 +567,154 @@
 
     .admin-inline-actions.compact {
       justify-content: flex-start;
+    }
+  }
+
+  @media (max-width: 700px) {
+    .admin-table-scroll-body {
+      overflow-x: hidden;
+    }
+
+    .admin-table-wrap {
+      width: 100%;
+      overflow: hidden;
+    }
+
+    .admin-bookmark-table {
+      width: 100%;
+      min-width: 0;
+    }
+
+    .admin-bookmark-table col.col-selection {
+      width: 38px !important;
+    }
+
+    .admin-bookmark-table col.col-title {
+      width: auto !important;
+    }
+
+    .admin-bookmark-table col.col-actions {
+      width: 144px !important;
+    }
+
+    .admin-bookmark-table .col-url,
+    .admin-bookmark-table .col-category,
+    .admin-bookmark-table .col-open-method,
+    .admin-bookmark-table .col-open_method {
+      display: none !important;
+    }
+
+    .admin-bookmark-table th,
+    .admin-bookmark-table td {
+      padding: 9px 6px;
+    }
+
+    .admin-bookmark-table th:first-child,
+    .admin-bookmark-table td:first-child {
+      text-align: center;
+    }
+
+    .admin-bookmark-table td:last-child {
+      padding-left: 4px;
+      padding-right: 4px;
+    }
+
+    .admin-bookmark-cell {
+      min-width: 0;
+      gap: 8px;
+    }
+
+    .admin-bookmark-cell .admin-icon-badge.small {
+      width: 30px;
+      height: 30px;
+      font-size: 14px;
+    }
+
+    .admin-bookmark-info {
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .admin-bookmark-info > strong {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .admin-bookmark-title-full {
+      display: none;
+    }
+
+    .admin-bookmark-title-mobile {
+      display: inline;
+    }
+
+    .admin-bookmark-meta {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+      margin-top: 3px;
+      color: var(--admin-subtle);
+      font-size: 11px;
+      line-height: 1.3;
+    }
+
+    .admin-bookmark-category,
+    .admin-bookmark-method {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .admin-bookmark-category {
+      max-width: 58%;
+    }
+
+    .admin-bookmark-method {
+      flex: 0 1 auto;
+    }
+
+    .admin-bookmark-mobile-url {
+      display: block;
+      min-width: 0;
+      overflow: hidden;
+      color: var(--admin-link);
+      font-size: 11px;
+      line-height: 1.3;
+      text-decoration: none;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .admin-bookmark-mobile-url:hover {
+      text-decoration: underline;
+    }
+
+    .admin-bookmark-mobile-health {
+      display: inline-flex;
+      margin-top: 3px;
+    }
+
+    .admin-bookmark-cell p {
+      display: none;
+    }
+
+    .admin-inline-actions.compact {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 4px;
+      width: 100%;
+    }
+
+    .admin-inline-actions.compact .admin-ghost-button,
+    .admin-inline-actions.compact .admin-danger-button {
+      min-width: 0;
+      padding-left: 3px;
+      padding-right: 3px;
+      font-size: 11px;
+      white-space: nowrap;
     }
   }
 </style>
