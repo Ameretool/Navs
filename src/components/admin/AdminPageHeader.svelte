@@ -82,7 +82,7 @@
     position: fixed;
     top: 24px;
     right: 24px;
-    z-index: 50;
+    z-index: 1000;
     display: flex;
     gap: 0.5rem;
   }
