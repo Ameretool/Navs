@@ -347,6 +347,7 @@
       height: auto;
       min-height: 100dvh;
       padding: 12px;
+      padding-bottom: calc(76px + env(safe-area-inset-bottom));
       overflow: visible;
     }
 

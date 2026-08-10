@@ -155,15 +155,24 @@
 
   @media (max-width: 700px) {
     .page-header {
-      grid-template-columns: minmax(0, 1fr);
-      align-items: start;
-      gap: 12px;
-      padding: 14px;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
     }
 
     .admin-header-actions {
-      width: 100%;
       justify-content: flex-end;
+      gap: 6px;
+    }
+
+    .icon-button {
+      width: 2rem;
+      height: 2rem;
+    }
+
+    h1 {
+      font-size: 22px;
     }
   }
 </style>

@@ -4,14 +4,21 @@ import { describe, expect, it } from 'vitest'
 describe('admin mobile layout contracts', () => {
   it('keeps the page header actions in normal document flow', () => {
     const header = readFileSync('src/components/admin/AdminPageHeader.svelte', 'utf8')
+    const mobileHeader = header.slice(header.indexOf('@media (max-width: 700px)'))
 
     expect(header.indexOf('<header class="page-header">')).toBeLessThan(header.indexOf('class="admin-header-actions"'))
     expect(header).toContain('grid-template-columns: minmax(0, 1fr) auto')
-    expect(header).toContain('grid-template-columns: minmax(0, 1fr);')
+    expect(mobileHeader).toContain('grid-template-columns: minmax(0, 1fr) auto')
+    expect(mobileHeader).toContain('padding: 10px 12px')
+    expect(mobileHeader).toContain('width: 2rem')
     expect(header).not.toContain('position: fixed')
 
     const sidebar = readFileSync('src/components/AdminSidebar.svelte', 'utf8')
     expect(sidebar).toContain('top: auto')
+
+    const admin = readFileSync('src/views/Admin.svelte', 'utf8')
+    const narrowAdminPage = admin.slice(admin.indexOf('@media (max-width: 720px)'))
+    expect(narrowAdminPage).toContain('padding-bottom: calc(76px + env(safe-area-inset-bottom))')
   })
 
   it('keeps mobile status metrics in one three-column row', () => {
