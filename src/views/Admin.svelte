@@ -330,7 +330,7 @@
   @media (max-width: 700px) {
     .admin-page {
       padding: 12px;
-      padding-bottom: 76px;
+      padding-bottom: calc(76px + env(safe-area-inset-bottom));
       height: 100dvh;
       grid-template-rows: auto 1fr;
     }
@@ -347,6 +347,7 @@
       height: auto;
       min-height: 100dvh;
       padding: 12px;
+      padding-bottom: calc(76px + env(safe-area-inset-bottom));
       overflow: visible;
     }
 

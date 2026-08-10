@@ -353,7 +353,9 @@
 
   .admin-status-panel {
     display: grid;
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    padding: 12px;
   }
 }
 
@@ -399,6 +401,26 @@
 }
 
 @media (max-width: 700px) {
+  .admin-status-item {
+    min-width: 0;
+    gap: 4px;
+  }
+
+  .admin-status-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .admin-status-item > p {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
   .col-open-method,
   .col-url {
     display: none !important;

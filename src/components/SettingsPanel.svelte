@@ -108,7 +108,6 @@
     <div class="panel-header-copy">
       <p class="panel-eyebrow">设置</p>
       <h2>站点设置</h2>
-      <p class="panel-desc">按功能区管理站点信息、外观与访问方式。右侧预览直接使用当前未保存内容，保存后才会更新公开首页。</p>
     </div>
     <div class="header-actions">
       <p class="helper-text">
@@ -332,18 +331,10 @@
     text-wrap: balance;
   }
 
-  .panel-desc,
   .status-desc,
   .helper-text {
     color: var(--sp-muted);
     line-height: 1.55;
-  }
-
-  .panel-desc {
-    margin-top: 4px;
-    max-width: 54ch;
-    font-size: 13px;
-    text-wrap: pretty;
   }
 
   .error-banner,

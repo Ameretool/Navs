@@ -7,6 +7,7 @@
     getAdminListTotalPages,
   } from '../../lib/adminListState'
   import { getBookmarkFallbackIcon, getBookmarkIconUrl, hasBookmarkImageIcon } from '../../lib/bookmarkIconDisplay'
+  import { truncateUnicodeText } from '../../lib/truncateUnicodeText'
   import CachedBookmarkIcon from '../CachedBookmarkIcon.svelte'
   import './adminListPanels.css'
 
@@ -143,9 +144,11 @@
                   {/if}
                 </span>
                 <div class="zero-item-info">
-                  <strong>{bookmark.title}</strong>
+                  <strong title={bookmark.title} aria-label={bookmark.title}>{truncateUnicodeText(bookmark.title, 20)}</strong>
                   <span class="zero-item-cat">{categoryTitleById.get(bookmark.category_id) ?? '未知分类'}</span>
-                  <a href={bookmark.url} target="_blank" rel="noreferrer" class="zero-item-url">{bookmark.url}</a>
+                  <a href={bookmark.url} target="_blank" rel="noreferrer" class="zero-item-url" title={bookmark.url} aria-label={`打开 ${bookmark.url}`}>
+                    {truncateUnicodeText(bookmark.url, 20)}
+                  </a>
                 </div>
               </div>
             {/each}
@@ -292,9 +295,16 @@
     flex-direction: column;
     align-items: flex-start;
     gap: 4px;
+    overflow: hidden;
+  }
+
+  .zero-item-info strong {
+    max-width: 100%;
   }
 
   .zero-item-url {
+    display: block;
+    min-width: 0;
     font-size: 12px;
     color: var(--admin-subtle);
     text-decoration: none;
