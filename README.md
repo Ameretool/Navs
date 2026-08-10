@@ -75,6 +75,8 @@
 
 ## 快速部署
 
+如果你第一次使用 Cloudflare，建议先选择一种部署方式并完整走完，不要混用两套流程。两种方式最终都会通过 `/install` 初始化数据库和管理员账号。
+
 CF-Navs 需要以下 Cloudflare 资源：
 
 | 资源 | 绑定名 | 用途 |
@@ -83,30 +85,37 @@ CF-Navs 需要以下 Cloudflare 资源：
 | KV Namespace | `SESSION` | 保存管理员会话 |
 | Secret | `SETUP_TOKEN` | 手动配置，授权首次安装 |
 
-### 方式一：Cloudflare 控制台部署
+### 方式一：Cloudflare 控制台部署（推荐）
 
-适合希望通过 GitHub Fork 持续部署的用户。
+适合不想在本地安装 Wrangler 的用户。Cloudflare 会从 GitHub 的 `main` 分支自动构建和部署。
 
-1. [Fork 本仓库](https://github.com/lbjxr/CF-Navs/fork)。
-2. 在 Cloudflare 控制台打开 **Workers & Pages → Create application → Import a repository**，选择你 Fork 后的仓库。
-3. 将生产分支设为 `main`，Build command 填写 `npm run build`，Deploy command 填写 `npx wrangler deploy`。
-4. 保存并完成首轮生产部署。首轮部署会创建并绑定 `DB` 与 `SESSION`。
+1. [Fork 本仓库](https://github.com/lbjxr/CF-Navs/fork)，并确认 Fork 的默认分支为 `main`。
+2. 在 Cloudflare 控制台打开 **Workers & Pages → Create application → Import a repository**，授权 Cloudflare 访问 GitHub，并选择你的 Fork。
+3. 在构建配置中填写：
+   - 生产分支：`main`
+   - 根目录：`/`
+   - Build command：`npm run build`
+   - Deploy command：`npx wrangler deploy`
+4. 保存并完成第一次 **Production** 部署。正常情况下，Cloudflare 会根据 [`wrangler.toml`](wrangler.toml) 创建并绑定 `DB` D1 数据库和 `SESSION` KV 命名空间。
+
+   首次部署后应能看到这两个绑定。如果出现 missing binding 或资源创建权限错误，先确认部署来自 `main`、Cloudflare 当前选择的是正确账号，并查看[故障排查](docs/guides/TROUBLESHOOTING.md)；不要在没有确认账号和资源的情况下重复创建数据库或 KV。
 
 <p align="center">
   <img src="docs/screenshots/cf-deploy3.jpg" alt="在 Cloudflare Worker 中添加 SETUP_TOKEN 密钥" width="100%">
 </p>
 
-5. 首轮部署完成后，在 Worker 的 **设置 → 变量和密钥** 中，手动添加类型为**密钥**的 `SETUP_TOKEN`，值使用足够长的随机字符串。不要把它添加为普通文本变量。( **注意：** 如果已经存在`SETUP_TOKEN`，请编辑一下修改密钥值，然后在 **设置** 页面下面 **构建** 中 **清理缓存** )
-6. 保存 Secret 后重新触发生产分支部署，再访问 `https://你的站点/install`，Ctrl+F5强制刷新页面，输入上一步 `SETUP_TOKEN`的值，再创建管理员用户名和密码。
-7. 确认安装和登录成功后，删除或轮换 `SETUP_TOKEN`。
+5. 第一次生产部署完成后，在 Worker 的 **设置 → 变量和密钥** 中选择**生产环境**，配置 `SETUP_TOKEN`：
+   - 如果列表中已经有 Cloudflare 自动生成的 `SETUP_TOKEN`，请编辑它并替换为你自己保存的值，然后在 **设置 → 构建** 中执行一次**清理缓存**。
+   - 如果已有的是普通文本变量而不是密钥，请删除它，再重新添加类型为**密钥**的 `SETUP_TOKEN`。不要同时保留同名的普通变量和 Secret。
+   - 如果列表中没有 `SETUP_TOKEN`，请手动添加类型为**密钥**的变量。值使用足够长的随机字符串，不要添加为普通文本变量。
+6. 保存 Secret 后重新部署同一个 `main` 生产部署：可以在 **Deployments** 页面对最近一次生产部署执行 **Retry/Redeploy**，也可以向 `main` 推送一个新提交。不要只保存 Secret 后直接访问 `/install`，必须先让新的部署读取到 Secret。
+7. 打开部署后的 Workers URL，并访问 `/install`。输入当前生产环境中配置的 `SETUP_TOKEN` 值，再创建管理员用户名和密码。确认安装和登录成功后，删除或轮换这个令牌；无论它原来是 Cloudflare 自动生成的还是你手动添加的，已完成安装的站点都不再需要它。
 
-> Cloudflare Git 会根据 [`wrangler.toml`](wrangler.toml) 中不带资源 ID 的声明创建并绑定 `DB` 与 `SESSION`。`SETUP_TOKEN` 不属于 GitHub 导入器的自动初始化参数。如果导入页面或旧 Worker 中出现自动生成的 `SETUP_TOKEN` 普通变量，请删除它，再按上面的步骤手动创建生产环境 Secret。已有 Fork 应使用 **Import a repository**，不要使用会新建仓库的通用 Deploy Button。
-
-> Cloudflare Git 的 Deploy command 应使用 `npx wrangler deploy`。`npm run deploy` 会读取本地生成的 `wrangler.local.toml`，只适合本地 Wrangler CLI 部署。
+自定义域名是可选项：先在 **域和路由** 中添加并启用自定义域名，确认它可以正常访问并完成登录，再根据需要关闭 `workers.dev` 地址。如果还没有准备好自定义域名，请保留 Workers URL，不要提前关闭默认访问入口。
 
 ### 方式二：Wrangler CLI 部署
 
-前置条件：Node.js 18+、npm 和 Cloudflare 账号。
+前置条件：Node.js 18+、npm 和 Cloudflare 账号。所有资源命令都会作用于当前 Wrangler 登录的账号；如果你有多个 Cloudflare 账号，先用 `npx wrangler whoami` 确认账号。
 
 ```bash
 git clone https://github.com/lbjxr/CF-Navs.git
@@ -114,18 +123,31 @@ cd CF-Navs
 npm install
 
 npx wrangler login
+npx wrangler whoami
+
+# 下面两个 create 命令只在资源尚不存在时执行一次
 npx wrangler d1 create cf-navs-db
 npx wrangler kv namespace create SESSION
 
 npm run setup:wrangler
-npm run deploy                 # 首轮部署，先创建 Worker 和资源
+npm run deploy                 # 首轮部署，先创建 Worker
 npx wrangler secret put SETUP_TOKEN
 npm run deploy                 # Secret 生效后重新部署
 ```
 
-`npm run setup:wrangler` 会把真实资源 ID 写入 Git 忽略的 `wrangler.local.toml`。部署完成后访问 `/install`，由安装器初始化数据库结构并创建管理员。
+如果 D1 数据库或 KV 命名空间已经存在，不要再次执行 `create` 命令；先使用 `npx wrangler d1 list` 和 `npx wrangler kv namespace list` 确认当前账号中的资源，再运行 `npm run setup:wrangler`。D1 数据库名应为 `cf-navs-db`，Worker 的 KV 绑定名应为 `SESSION`。
+
+`npm run setup:wrangler` 会把真实资源 ID 写入 Git 忽略的 `wrangler.local.toml`。部署完成后访问 `/install`，由安装器初始化数据库结构并创建管理员。首次部署完成前不要执行 `wrangler secret put`，因为 Worker 尚未创建。
 
 正常安装不需要手动执行 SQL。只有安装器报告 schema 初始化失败时，才使用 [`schema.sql`](schema.sql) 或 `npm run db:init:remote` 恢复。
+
+### 两种方式通用的部署后检查
+
+- `/install` 可以打开，并能使用 `SETUP_TOKEN` 完成初始化。
+- 能使用刚创建的管理员账号登录后台。
+- 分类和书签可以正常保存；刷新页面后数据仍然存在。
+- 如果页面仍显示旧版本，先强制刷新，让新版 Service Worker 接管。
+- 如果安装或绑定失败，查看 Worker 日志：`npx wrangler tail`。涉及线上数据的命令前，先确认当前 Cloudflare 账号和目标 Worker。
 
 完整步骤与故障排查请阅读：
 
