@@ -54,9 +54,13 @@ export function cacheResponse(context: unknown, request: Request, response: Resp
   executionCtx?.waitUntil(edgeCache.put(request, response.clone()))
 }
 
-export async function getCachedIconResponse(request: Request): Promise<Response | undefined> {
+export async function getCachedResponse(request: Request): Promise<Response | undefined> {
   const edgeCache = (caches as unknown as { default: Cache }).default
   return (await edgeCache.match(request)) ?? undefined
+}
+
+export async function getCachedIconResponse(request: Request): Promise<Response | undefined> {
+  return getCachedResponse(request)
 }
 
 export function cachedFallbackIconResponse(

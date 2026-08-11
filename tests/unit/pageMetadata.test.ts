@@ -15,6 +15,7 @@ import {
   normalizeTitleText,
   parseTargetUrl,
   pickBookmarkTitle,
+  readHtmlHeadBytes,
   resolveHttpUrl,
 } from '../../worker/lib/pageMetadata'
 
@@ -99,6 +100,71 @@ describe('pageMetadata charset handling', () => {
     const page = concat(utf8('<title>'), GBK_ZHONGWEN, utf8('</title>'))
     // 这正是 normalizeTitleText 的 U+FFFD 体检要拦下的情况
     expect(decodeHtmlBytes(page, 'text/html; charset=utf-8')).toContain('�')
+  })
+})
+
+describe('pageMetadata streaming head read', () => {
+  // 用 pull 而不是 start 预先入队，才能观察到「不再继续拉取」这个真正的行为。
+  // 命中 </head> 时当前 chunk 已经复制完了，省下的是后面的 chunk。
+  function pullStream(chunks: Uint8Array[], pulled: Uint8Array[]): ReadableStream<Uint8Array> {
+    let index = 0
+    return new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (index >= chunks.length) {
+          controller.close()
+          return
+        }
+        const chunk = chunks[index++]
+        pulled.push(chunk)
+        controller.enqueue(chunk)
+      },
+    })
+  }
+
+  it('stops pulling once </head> arrives', async () => {
+    const pulled: Uint8Array[] = []
+    const bytes = await readHtmlHeadBytes(
+      pullStream([utf8('<html><head><title>Fast</title></head>'), utf8('x'.repeat(50_000))], pulled),
+    )
+
+    expect(pulled).toHaveLength(1) // 50KB 的 body 从未被拉取
+    expect(new TextDecoder().decode(bytes)).toContain('<title>Fast</title>')
+  })
+
+  it('detects </head> split across chunk boundaries', async () => {
+    const pulled: Uint8Array[] = []
+    const bytes = await readHtmlHeadBytes(
+      pullStream(
+        [utf8('<head><title>Split</title></he'), utf8('ad><body>'), utf8('y'.repeat(50_000))],
+        pulled,
+      ),
+    )
+
+    expect(pulled).toHaveLength(2)
+    expect(new TextDecoder().decode(bytes)).toContain('Split')
+  })
+
+  it('matches an uppercase </HEAD>', async () => {
+    const pulled: Uint8Array[] = []
+    await readHtmlHeadBytes(
+      pullStream([utf8('<HEAD><TITLE>Up</TITLE></HEAD>'), utf8('z'.repeat(50_000))], pulled),
+    )
+
+    expect(pulled).toHaveLength(1)
+  })
+
+  it('caps the read when </head> never appears', async () => {
+    const pulled: Uint8Array[] = []
+    const bytes = await readHtmlHeadBytes(pullStream([utf8('<html>' + 'z'.repeat(5_000))], pulled), 1_024)
+
+    expect(bytes.length).toBe(1_024)
+  })
+
+  it('returns everything when the stream ends early', async () => {
+    const pulled: Uint8Array[] = []
+    const bytes = await readHtmlHeadBytes(pullStream([utf8('<html><title>Tiny</title>')], pulled))
+
+    expect(new TextDecoder().decode(bytes)).toBe('<html><title>Tiny</title>')
   })
 })
 
@@ -223,9 +289,25 @@ describe('pageMetadata junk title detection', () => {
     expect(isJunkTitle('Checking your browser before accessing')).toBe(true)
   })
 
+  it('rejects login page titles', () => {
+    expect(isJunkTitle('Sign in - Google Accounts')).toBe(true)
+    expect(isJunkTitle('登录 - 知乎')).toBe(true)
+    expect(isJunkTitle('Sign in')).toBe(true)
+    expect(isJunkTitle('登录')).toBe(true)
+    expect(isJunkTitle('Redirecting...')).toBe(true)
+  })
+
+  it('does not reject ordinary titles that merely start with a login word', () => {
+    // 故意保守：宁可漏掉 "Log in to GitHub"，也不能把这类正常标题判成登录页
+    expect(isJunkTitle('Login Manager 使用手册')).toBe(false)
+    expect(isJunkTitle('Log in to GitHub')).toBe(false)
+    expect(isJunkTitle('登录态设计笔记')).toBe(false)
+  })
+
   it('accepts real titles', () => {
     expect(isJunkTitle('GitHub')).toBe(false)
     expect(isJunkTitle('百度一下，你就知道')).toBe(false)
+    expect(isJunkTitle('Signal 官网')).toBe(false)
   })
 })
 
@@ -419,6 +501,31 @@ describe('pickBookmarkTitle', () => {
         requestedUrl: 'https://www.example.com/a',
       }),
     ).toBe('example.com')
+  })
+
+  it('falls back to the requested host, not the redirect target', () => {
+    // mail.google.com 未登录会被跳到 accounts.google.com，
+    // 拿登录页的域名当书签名毫无意义
+    const loginPage = '<head><title>Sign in - Google Accounts</title></head>'
+    expect(
+      pickBookmarkTitle({
+        html: loginPage,
+        finalUrl: 'https://accounts.google.com/ServiceLogin?service=mail',
+        requestedUrl: 'https://mail.google.com/mail/u/0/',
+      }),
+    ).toBe('mail.google.com')
+  })
+
+  it('still uses the redirect target title for ordinary redirects', () => {
+    // 短链和域名迁移是正常重定向，落点标题才是用户要的
+    const article = '<head><meta property="og:title" content="真实文章标题"></head>'
+    expect(
+      pickBookmarkTitle({
+        html: article,
+        finalUrl: 'https://blog.example.com/posts/1',
+        requestedUrl: 'https://sho.rt/abc',
+      }),
+    ).toBe('真实文章标题')
   })
 
   it('skips anti-bot interstitial titles instead of filling them in', () => {

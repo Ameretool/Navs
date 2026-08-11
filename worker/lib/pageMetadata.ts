@@ -3,11 +3,67 @@
 // 路由只负责编排，这里只负责抓取和纯文本解析。
 
 export const HTML_ACCEPT = 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.1'
-export const MAX_HTML_BYTES = 256_000
+export const MAX_HTML_BYTES = 131_072
 export const FETCH_TIMEOUT_MS = 3000
 export const MAX_TITLE_LENGTH = 80
 // charset 只可能出现在文档开头，扫描前若干字节即可，不必解码整篇。
 const CHARSET_SNIFF_BYTES = 2048
+// 标题和 og 标签都在 <head> 里，读到 </head> 就可以断开连接，
+// 不必把整个页面 body 下载完 —— 这是这条链路上最大的一笔时间。
+const HEAD_END = new Uint8Array([0x3c, 0x2f, 0x68, 0x65, 0x61, 0x64, 0x3e]) // </head>
+
+function toLowerAsciiByte(value: number): number {
+  return value >= 0x41 && value <= 0x5a ? value + 0x20 : value
+}
+
+function indexOfAsciiSequence(
+  haystack: Uint8Array,
+  needle: Uint8Array,
+  from: number,
+  end: number,
+): number {
+  const limit = end - needle.length
+  for (let i = Math.max(0, from); i <= limit; i++) {
+    let matched = true
+    for (let j = 0; j < needle.length; j++) {
+      if (toLowerAsciiByte(haystack[i + j]) !== needle[j]) {
+        matched = false
+        break
+      }
+    }
+    if (matched) return i
+  }
+  return -1
+}
+
+// 边读边找 </head>：命中就 cancel，让上游停止发送剩余 body。
+export async function readHtmlHeadBytes(
+  stream: ReadableStream<Uint8Array>,
+  maxBytes = MAX_HTML_BYTES,
+): Promise<Uint8Array> {
+  const reader = stream.getReader()
+  const buffer = new Uint8Array(maxBytes)
+  let length = 0
+
+  try {
+    while (length < maxBytes) {
+      const { done, value } = await reader.read()
+      if (done) break
+      if (!value || value.length === 0) continue
+
+      const copied = Math.min(value.length, maxBytes - length)
+      buffer.set(value.subarray(0, copied), length)
+      // </head> 可能跨 chunk，回退 needle 长度重叠搜索
+      const searchFrom = Math.max(0, length - HEAD_END.length + 1)
+      length += copied
+      if (indexOfAsciiSequence(buffer, HEAD_END, searchFrom, length) >= 0) break
+    }
+  } finally {
+    void reader.cancel().catch(() => {})
+  }
+
+  return buffer.subarray(0, length)
+}
 
 export type PageFetchResult = {
   html: string | null
@@ -270,7 +326,12 @@ export async function fetchPageHtml(url: string): Promise<PageFetchResult | null
       return { html: null, finalUrl }
     }
 
-    return { html: decodeHtmlBytes(await response.arrayBuffer(), contentType), finalUrl }
+    // 只读到 </head> 就断开；没有 body 流时退回一次性读取。
+    const bytes = response.body
+      ? await readHtmlHeadBytes(response.body)
+      : new Uint8Array(await response.arrayBuffer())
+
+    return { html: decodeHtmlBytes(bytes, contentType), finalUrl }
   } catch {
     return null
   }
@@ -384,12 +445,32 @@ const JUNK_TITLES = new Set([
   'are you a robot?',
 ])
 
+// 登录页字样。只在「整个标题就是登录字样」或「登录字样后紧跟分隔符」时判为登录页，
+// 故意不匹配 "Login Manager 使用手册" 这类以登录词开头的正常标题。
+const LOGIN_TITLES = new Set([
+  'sign in',
+  'sign up',
+  'signin',
+  'log in',
+  'login',
+  '登录',
+  '登陆',
+  '请登录',
+  '用户登录',
+])
+const LOGIN_TITLE_PREFIX = /^(sign in|sign up|signin|log in|login|登录|登陆|请登录)\s*[-–—|·:：｜]/
+
 export function isJunkTitle(value: string): boolean {
   const normalized = value.trim().toLowerCase()
   if (!normalized) return true
   if (JUNK_TITLES.has(normalized)) return true
   // Cloudflare / 各类人机校验页
-  return /^(just a moment|attention required|please wait|checking your browser|一个时刻)/.test(normalized)
+  if (/^(just a moment|attention required|please wait|checking your browser|一个时刻)/.test(normalized)) {
+    return true
+  }
+  // 需要登录的站点会被跳到登录页，登录页标题不是用户想要的书签名
+  if (LOGIN_TITLES.has(normalized) || LOGIN_TITLE_PREFIX.test(normalized)) return true
+  return /^(redirecting|正在跳转|页面跳转中)/.test(normalized)
 }
 
 // 先切到 <head>，再解析：既排除正文里 <svg><title>Logo</title></svg> 的误命中，
@@ -469,5 +550,7 @@ export function pickBookmarkTitle(input: {
     }
   }
 
-  return hostnameFallbackTitle(fallbackUrl) || hostnameFallbackTitle(input.requestedUrl)
+  // 兜底用用户输入的地址，而不是重定向落点：mail.google.com 未登录会被跳到
+  // accounts.google.com，拿登录页的域名当书签名毫无意义。
+  return hostnameFallbackTitle(input.requestedUrl) || hostnameFallbackTitle(fallbackUrl)
 }

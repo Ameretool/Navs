@@ -9,6 +9,7 @@ import {
   parseTargetUrl,
   pickBookmarkTitle,
 } from '../lib/pageMetadata'
+import { cacheResponse, getCachedResponse } from '../lib/iconResponses'
 import { fail, ok } from '../lib/response'
 import type { HonoEnv } from '../types'
 
@@ -18,6 +19,7 @@ const ICON_ACCEPT = 'image/avif,image/webp,image/apng,image/*,*/*;q=0.1'
 const OVERALL_DEADLINE_MS = 6000
 // 站点名称只需要一次页面抓取，不用像图标那样逐个探测候选，deadline 相应更短。
 const SITE_META_DEADLINE_MS = 4000
+const SITE_META_CACHE_SECONDS = 6 * 60 * 60
 
 function badRequest(c: AppContext, msg: string) {
   return c.json(fail(ErrCode.BAD_REQUEST, msg))
@@ -123,6 +125,20 @@ faviconRoutes.get('/fetch-site-meta', async (c) => {
   }
 
   const requestedUrl = targetUrl.toString()
+  // 用合成的 key 命中 edge cache：不带 Authorization，且按目标地址区分。
+  const cacheKey = new Request(
+    `https://cf-navs.internal/site-meta?url=${encodeURIComponent(requestedUrl)}`,
+    { method: 'GET' },
+  )
+
+  const cached = await getCachedResponse(cacheKey)
+  if (cached) {
+    return new Response(cached.body, {
+      status: cached.status,
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+    })
+  }
+
   const fallback: SiteMetaResp = {
     title: hostnameFallbackTitle(requestedUrl),
     final_url: requestedUrl,
@@ -140,14 +156,32 @@ faviconRoutes.get('/fetch-site-meta', async (c) => {
     }
   }
 
+  let meta = fallback
   try {
     const deadline = new Promise<SiteMetaResp>((resolve) =>
       setTimeout(() => resolve(fallback), SITE_META_DEADLINE_MS),
     )
-    return c.json(ok<SiteMetaResp>(await Promise.race([resolveSiteMeta(), deadline])))
+    meta = await Promise.race([resolveSiteMeta(), deadline])
   } catch {
-    return c.json(ok<SiteMetaResp>(fallback))
+    meta = fallback
   }
+
+  // 只缓存真正解析出内容的结果：域名兜底通常意味着这次抓取失败或被拦，
+  // 缓存它会让用户重试时一直拿到同一个坏结果。
+  if (meta.title && meta.title !== fallback.title) {
+    cacheResponse(
+      c,
+      cacheKey,
+      new Response(JSON.stringify(ok<SiteMetaResp>(meta)), {
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': `public, max-age=${SITE_META_CACHE_SECONDS}`,
+        },
+      }),
+    )
+  }
+
+  return c.json(ok<SiteMetaResp>(meta))
 })
 
 export default faviconRoutes
