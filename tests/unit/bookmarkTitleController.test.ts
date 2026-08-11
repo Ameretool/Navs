@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  BOOKMARK_TITLE_FILL_MAX_LENGTH,
   createBookmarkTitleState,
   normalizeTitleLookupUrl,
   resolveBookmarkTitleError,
@@ -178,6 +179,41 @@ describe('bookmark title controller resolution', () => {
     })
 
     expect(resolved.title).toBeNull()
+  })
+
+  it('shortens a long title so it fits the input box', () => {
+    const start = scheduled()
+    const resolved = resolveBookmarkTitleSuccess(start.state, {
+      requestId: start.task!.requestId,
+      title: '这是一个非常非常长的站点名称用来测试自动截断行为是否正确',
+      currentTitle: '',
+    })
+
+    expect(Array.from(resolved.title ?? '')).toHaveLength(BOOKMARK_TITLE_FILL_MAX_LENGTH)
+    expect(resolved.title?.endsWith('…')).toBe(true)
+    expect(resolved.title?.startsWith('这是一个非常非常长的站点名称')).toBe(true)
+  })
+
+  it('leaves a short title untouched', () => {
+    const start = scheduled()
+    const resolved = resolveBookmarkTitleSuccess(start.state, {
+      requestId: start.task!.requestId,
+      title: '百度一下，你就知道',
+      currentTitle: '',
+    })
+
+    expect(resolved.title).toBe('百度一下，你就知道')
+  })
+
+  it('does not split an emoji when shortening', () => {
+    const start = scheduled()
+    const resolved = resolveBookmarkTitleSuccess(start.state, {
+      requestId: start.task!.requestId,
+      title: '😀'.repeat(30),
+      currentTitle: '',
+    })
+
+    expect(resolved.title).toBe(`${'😀'.repeat(BOOKMARK_TITLE_FILL_MAX_LENGTH - 1)}…`)
   })
 
   it('ignores a stale success response', () => {

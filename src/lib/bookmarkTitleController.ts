@@ -2,6 +2,12 @@
 // 与 bookmarkIconifyController 同构：requestId 单调递增防竞态、lastUrl 去重。
 // 因为由网址输入框失焦触发，不需要 debounce，所以没有定时器。
 
+import { truncateUnicodeText } from './truncateUnicodeText'
+
+// 自动填充的内容会直接落进标题输入框，太长会撑出可视范围、不好修改。
+// 与后台列表、访问分析里的截断长度保持一致。
+export const BOOKMARK_TITLE_FILL_MAX_LENGTH = 20
+
 export type BookmarkTitleState = {
   loading: boolean
   error: string
@@ -94,7 +100,7 @@ export function resolveBookmarkTitleSuccess(
   }
 
   const nextState: BookmarkTitleState = { ...state, loading: false, error: '' }
-  const title = input.title.trim()
+  const title = truncateUnicodeText(input.title.trim(), BOOKMARK_TITLE_FILL_MAX_LENGTH)
   // 请求在途期间用户自己打了标题 —— 「仅为空时填」策略的最后一道防线。
   if (!title || input.currentTitle.trim()) {
     return { state: nextState, title: null }
