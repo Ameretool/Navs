@@ -102,6 +102,26 @@
 
 `POST /api/bookmarks/check-health` 最多检查请求中的前 20 个书签，Worker 先用 HEAD 请求目标地址，遇到 405、403 或 400 时回退 GET，单个目标超时为 3 秒，返回 HTTP 状态码、`ok`、`timeout` 或 `error`。
 
+## 站点信息接口
+
+| 方法 | 路径 | 鉴权 | 返回 |
+| --- | --- | --- | --- |
+| GET | `/api/fetch-site-meta?url=` | 登录 | `SiteMetaResp` |
+
+新增书签时用于自动解析站点名称。服务端抓取目标页并解析标题，**接口不会失败**：非法 `url` 返回 `code=1002`，其余任何情况（抓取超时、非 HTML、反爬拦截、解码失败）都返回 `code=0`，`title` 退回去掉 `www.` 前缀的域名。
+
+名称按用户输入的地址判断意图：`url` 指向根路径（`/`、空路径或 `index.html` 一类默认文档）时优先取 `og:site_name`，再依次尝试 `og:title`、`twitter:title`、`<title>`；深层链接则优先 `og:title`，再依次 `twitter:title`、`<title>`、`og:site_name`。根/深层的判定使用请求地址而非重定向落点，因为它代表用户的收藏意图。
+
+解析结果会做归一化：解码 HTML 实体（单次扫描，不会把 `&amp;lt;` 二次解码）、折叠空白、剥离控制字符与零宽/双向控制符、按 Unicode 码位截断到 80。占位与反爬标题（`Untitled`、`无标题`、`404 Not Found`、`Just a moment...` 等）和解码失败（含 U+FFFD）的候选会被跳过并继续尝试下一来源，全部失败才用域名兜底。
+
+页面抓取共用 `worker/lib/pageMetadata.ts`：单次请求 3 秒超时，整体 4 秒 deadline，按 BOM → `Content-Type` charset → `<meta charset>` 的顺序选择解码器，因此 GBK/GB2312/Big5 等非 UTF-8 页面也能解出正确标题；不支持的 charset label 回退 UTF-8。目标地址中内嵌的账号密码会在请求前剥离。
+
+出网目标过滤：`/api/fetch-site-meta` 与 `/api/fetch-favicon` 共用 `parseTargetUrl`，拒绝指向环回、私有、链路本地（含云元数据 `169.254.169.254`）、运营商级 NAT、组播保留段的 IPv4/IPv6 字面量，以及 `localhost`、`*.local`、`*.internal`、`metadata.google.internal` 等内部主机名，被拒绝时返回 `code=1002`。`favicon` 解析出的 `<link rel="icon">` 候选来自第三方页面，同样经过该过滤，避免恶意页面绕过入口检查。该防线只检查地址字面量：`new URL()` 会先把 `2130706433`、`0x7f.0.0.1` 一类写法归一成点分形式，因此常见进制绕过已被拉平，但它**挡不住 DNS 重绑定**（合法域名解析到内网），Workers 没有可插手的解析钩子。
+
+前端只在**新增**书签、书签标题为空、且网址输入框失焦时调用该接口；返回后会再次确认标题仍为空才写入，请求在途期间用户已输入标题则丢弃结果。
+
+因为这是用户没有主动触发的后台请求，前端调用时带 `keepSessionOnUnauthorized`：接口返回 401 或 `code=1001` 时**不清除本地登录态**，避免 token 恰好过期时把用户正在填写、尚未保存的书签表单一起丢掉。用户主动发起的请求仍然按原有规则清除登录态。
+
 ## 图标接口
 
 | 方法 | 路径 | 鉴权 | 说明 |

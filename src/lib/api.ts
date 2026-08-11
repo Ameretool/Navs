@@ -23,6 +23,7 @@ import {
   type Settings,
   type SettingsUpdateReq,
   type SiteConfig,
+  type SiteMetaResp,
   type SortReq,
 } from '../../shared/types'
 
@@ -246,10 +247,13 @@ export function getErrorMessage(error: unknown): string {
 
 export interface RequestOptions extends RequestInit {
   auth?: boolean
+  // 后台自动发起的请求应设为 true：用户没主动操作时，不该因为一次 401
+  // 就清掉登录态，把手上未保存的表单一起弄丢。
+  keepSessionOnUnauthorized?: boolean
 }
 
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { auth = false, headers: initHeaders, ...init } = options
+  const { auth = false, keepSessionOnUnauthorized = false, headers: initHeaders, ...init } = options
   const headers = createHeaders(initHeaders)
 
   if (auth) {
@@ -281,7 +285,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   const envelope = isApiResponse<T>(payload) ? payload : null
 
   if (!response.ok) {
-    if (response.status === 401) {
+    if (response.status === 401 && !keepSessionOnUnauthorized) {
       clearStoredAuthSession()
     }
 
@@ -301,7 +305,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   }
 
   if (envelope.code !== ErrCode.OK) {
-    if (auth && envelope.code === ErrCode.UNAUTHORIZED) {
+    if (auth && envelope.code === ErrCode.UNAUTHORIZED && !keepSessionOnUnauthorized) {
       clearStoredAuthSession()
     }
 
@@ -385,6 +389,12 @@ export const bookmarksApi = {
   checkHealth: (ids: number[]) =>
     jsonRequest<Array<{ id: number; status: number | string; ok: boolean }>>('/bookmarks/check-health', 'POST', { ids }, true),
   fetchFavicon: (url: string) => request<FaviconResp>(`/fetch-favicon?url=${encodeURIComponent(url)}`, { auth: true }),
+  fetchSiteMeta: (url: string) =>
+    request<SiteMetaResp>(`/fetch-site-meta?url=${encodeURIComponent(url)}`, {
+      auth: true,
+      // 这是失焦时后台自动发起的，不能因为它把用户正在填的表单连同登录态一起清掉。
+      keepSessionOnUnauthorized: true,
+    }),
 }
 
 export const iconifyApi = {
