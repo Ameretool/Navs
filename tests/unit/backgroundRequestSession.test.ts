@@ -55,7 +55,7 @@ describe('background request session handling', () => {
     async (mode) => {
       vi.stubGlobal('fetch', vi.fn(async () => unauthorizedResponse(mode)))
 
-      await expect(api.bookmarks.list()).rejects.toThrow()
+      await expect(api.admin.getData()).rejects.toThrow()
       expect(getAuthToken()).toBeNull()
     },
   )

@@ -4,7 +4,6 @@ import {
   type ApiResponse,
   type DataVersionResp,
   type PublicData,
-  type Settings,
   type SiteConfig,
 } from '../../shared/types'
 import { toPublicSettings } from '../../shared/settings'
@@ -15,7 +14,7 @@ import {
   matchPublicDataCache,
   matchSiteConfigCache,
 } from '../lib/cache'
-import { getDataVersion, getPublicDataSource, getSiteConfig, incrementBookmarkClick } from '../lib/db'
+import { getDataVersion, getPublicDataSource, getSiteConfig, getSiteConfigWithDataVersion, incrementBookmarkClick } from '../lib/db'
 import { shouldBypassRequestCache } from '../lib/requestCache'
 import { fail } from '../lib/response'
 import { ok } from '../lib/response'
@@ -79,7 +78,8 @@ publicRoutes.get('/config', async (c) => {
 
 publicRoutes.get('/data/version', async (c) => {
   const token = extractBearerToken(c.req.header('Authorization'))
-  const siteConfig = await getSiteConfig(c.env.DB)
+  // 每次页面加载都会走这里，所以站点配置和数据版本合并成一条 D1 查询。
+  const { config: siteConfig, version } = await getSiteConfigWithDataVersion(c.env.DB)
 
   if (!siteConfig.public_mode) {
     if (!token) {
@@ -103,7 +103,7 @@ publicRoutes.get('/data/version', async (c) => {
   }
 
   const data: DataVersionResp = {
-    version: await getDataVersion(c.env.DB),
+    version,
     site_title: siteConfig.site_title,
     public_mode: siteConfig.public_mode,
   }

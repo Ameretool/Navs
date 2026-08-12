@@ -1,5 +1,4 @@
 import { Hono } from 'hono'
-import type { Context } from 'hono'
 import { ErrCode, type BatchDeleteReq, type CategorySortReq, type CategoryUpsertReq } from '../../shared/types'
 import {
   CategoryConflictError,
@@ -14,46 +13,23 @@ import {
 } from '../lib/db'
 import { invalidatePublicDataCache } from '../lib/cache'
 import { fail, ok } from '../lib/response'
+import {
+  badRequest,
+  isNonEmptyString,
+  isOptionalString,
+  parseBatchIds,
+  parseId,
+  parseSortIds,
+  readJson,
+  type AppContext,
+} from '../lib/routeHelpers'
 import { invalidateRuntimeDataCache } from '../lib/runtimeCache'
 import type { HonoEnv } from '../types'
-
-type AppContext = Context<HonoEnv>
-
-function badRequest(c: AppContext, msg: string) {
-  return c.json(fail(ErrCode.BAD_REQUEST, msg))
-}
-
-function parseId(c: AppContext): number | null {
-  const id = Number(c.req.param('id'))
-  return Number.isInteger(id) && id > 0 ? id : null
-}
-
-function isNonEmptyString(value: unknown): value is string {
-  return typeof value === 'string' && value.trim().length > 0
-}
-
-function isOptionalString(value: unknown): value is string | null | undefined {
-  return value === undefined || value === null || typeof value === 'string'
-}
 
 function parseParentId(value: unknown): number | null | undefined {
   if (value === undefined) return undefined
   if (value === null) return null
   return Number.isInteger(value) && Number(value) > 0 ? Number(value) : undefined
-}
-
-function parseBatchIds(value: unknown): number[] | null {
-  if (!Array.isArray(value) || value.length === 0 || value.length > 500) return null
-  const ids = [...new Set(value)]
-  return ids.length > 0 && ids.every((id) => Number.isInteger(id) && id > 0) ? ids as number[] : null
-}
-
-async function readJson<T>(c: AppContext): Promise<T | null> {
-  try {
-    return await c.req.json<T>()
-  } catch {
-    return null
-  }
 }
 
 export const categoriesRoutes = new Hono<HonoEnv>()
@@ -155,9 +131,9 @@ categoriesRoutes.post('/batch-delete', async (c) => {
 
 categoriesRoutes.post('/sort', async (c) => {
   const body = await readJson<CategorySortReq>(c)
-  const ids = body?.ids
+  const ids = parseSortIds(body?.ids)
   const parentId = parseParentId(body?.parent_id)
-  if (!Array.isArray(ids) || !ids.every((id) => Number.isInteger(id) && id > 0) || parentId === undefined) {
+  if (!ids || parentId === undefined) {
     return badRequest(c, 'invalid sort payload')
   }
 

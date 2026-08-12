@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { validateImportPayload } from '../../worker/lib/importValidation'
+import {
+  MAX_IMPORT_BOOKMARKS,
+  MAX_IMPORT_CATEGORIES,
+  validateImportPayload,
+} from '../../worker/lib/importValidation'
 
 const validPayload = {
   categories: [
@@ -29,6 +33,7 @@ describe('import payload validation', () => {
     expect(validateImportPayload(validPayload)).toEqual({
       ok: true,
       payload: validPayload,
+      droppedBookmarks: 0,
     })
   })
 
@@ -74,5 +79,92 @@ describe('import payload validation', () => {
       ok: false,
       message: 'invalid settings',
     })
+  })
+})
+
+describe('import payload size limits', () => {
+  function bookmark(id: number) {
+    return { ...validPayload.bookmarks[0], id }
+  }
+
+  it('rejects an oversized category list with an actionable message', () => {
+    // 之前完全不限长度：用户导入一个超大书签文件只会拿到一个没有解释的 500
+    const categories = Array.from({ length: MAX_IMPORT_CATEGORIES + 1 }, (_, index) => ({
+      ...validPayload.categories[0],
+      id: index + 1,
+    }))
+
+    expect(validateImportPayload({ ...validPayload, categories })).toEqual({
+      ok: false,
+      message: `too many categories, limit is ${MAX_IMPORT_CATEGORIES}`,
+    })
+  })
+
+  it('rejects an oversized bookmark list with an actionable message', () => {
+    const bookmarks = Array.from({ length: MAX_IMPORT_BOOKMARKS + 1 }, (_, index) => bookmark(index + 1))
+
+    expect(validateImportPayload({ ...validPayload, bookmarks })).toEqual({
+      ok: false,
+      message: `too many bookmarks, limit is ${MAX_IMPORT_BOOKMARKS}`,
+    })
+  })
+
+  it('accepts a list exactly at the limit', () => {
+    const bookmarks = Array.from({ length: MAX_IMPORT_BOOKMARKS }, (_, index) => bookmark(index + 1))
+
+    expect(validateImportPayload({ ...validPayload, bookmarks }).ok).toBe(true)
+  })
+})
+
+describe('import bookmark url policy', () => {
+  function bookmarkWithUrl(id: number, url: string) {
+    return { ...validPayload.bookmarks[0], id, url }
+  }
+
+  it('drops script-capable urls instead of failing the whole import', () => {
+    // 为了一条 javascript: 小书签让整次备份恢复失败，是比丢一条更糟的结果。
+    const result = validateImportPayload({
+      ...validPayload,
+      bookmarks: [
+        bookmarkWithUrl(10, 'https://github.com'),
+        bookmarkWithUrl(11, 'javascript:alert(1)'),
+        bookmarkWithUrl(12, 'data:text/html,x'),
+      ],
+    })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.droppedBookmarks).toBe(2)
+    expect(result.payload.bookmarks.map((bookmark) => bookmark.id)).toEqual([10])
+  })
+
+  it('rescues schemeless urls rather than dropping them', () => {
+    const result = validateImportPayload({
+      ...validPayload,
+      bookmarks: [bookmarkWithUrl(10, 'example.com/tools')],
+    })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.droppedBookmarks).toBe(0)
+    expect(result.payload.bookmarks[0].url).toBe('https://example.com/tools')
+  })
+
+  it('keeps valid urls as the exact same object', () => {
+    // 备份恢复不该重写地址，也不该产生多余的对象拷贝。
+    const original = bookmarkWithUrl(10, 'https://github.com')
+    const result = validateImportPayload({ ...validPayload, bookmarks: [original] })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.payload.bookmarks[0]).toBe(original)
+  })
+
+  it('still reports duplicate ids and missing categories before dropping', () => {
+    // 丢弃发生在引用校验之后：坏 URL 不该掩盖掉结构性错误。
+    expect(validateImportPayload({
+      ...validPayload,
+      bookmarks: [bookmarkWithUrl(10, 'javascript:alert(1)'), bookmarkWithUrl(10, 'https://a.com')],
+    })).toEqual({ ok: false, message: 'duplicate bookmark id: 10' })
   })
 })

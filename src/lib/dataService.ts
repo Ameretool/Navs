@@ -39,7 +39,9 @@ import { createBookmarkIconCacheKey, writeBookmarkIconDataUri } from './localBoo
 import { adminStore, authStore, configStore, publicStore } from './stores'
 
 type DataServiceHooks = {
-  onRootError: (message: string) => void
+  // error 透传原始异常：调用方需要按 code/status 分辨「服务端挂了」和
+  // 「未登录 / 公开模式关闭」这类正常业务分支，只有消息字符串不够用。
+  onRootError: (message: string, error?: unknown) => void
   onLocalSnapshotRestored: () => void
   onNetworkFallback: (message: string) => void
 }
@@ -155,7 +157,7 @@ export async function refreshPublicData(progressive = false): Promise<PublicData
           }
 
           if (!isPublicModeForbidden(authError)) {
-            hooks.onRootError(getErrorMessage(authError))
+            hooks.onRootError(getErrorMessage(authError), authError)
             return null
           }
         }
@@ -172,7 +174,7 @@ export async function refreshPublicData(progressive = false): Promise<PublicData
       return get(publicStore).data
     }
 
-    hooks.onRootError(getErrorMessage(error))
+    hooks.onRootError(getErrorMessage(error), error)
     return null
   }
 }

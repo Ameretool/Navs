@@ -3,7 +3,6 @@
   import { get } from 'svelte/store'
   import { fade } from 'svelte/transition'
   import {
-    type AdminData,
     type Bookmark,
     type Category,
     type ChangePasswordReq,
@@ -41,6 +40,11 @@
   } from './lib/appData'
   import { createLazyComponentLoader } from './lib/appLazyComponent'
   import {
+    createBrowserCustomScriptHost,
+    createCustomScriptController,
+    type CustomScriptController,
+  } from './lib/customScript'
+  import {
     canUseInstalledFallback,
     getInstallViewState,
     hasInstalledHint,
@@ -49,6 +53,8 @@
     normalizeInstallError,
     replaceBrowserPath,
     setInstalledHint,
+    shouldProbeInstallStatus,
+    shouldRecheckInstallAfterDataError,
     toInstallScreenState,
     type InstallScreenState,
   } from './lib/appInstall'
@@ -96,6 +102,8 @@
   let booting = true
   let installState: InstallScreenState = { type: 'checking' }
   let rootError = ''
+  // 数据加载失败时的原始异常，用来判断是否需要回头复核安装状态。
+  let lastDataError: unknown = null
   let currentView: AppView = 'home'
 
   function isAdminPath(): boolean {
@@ -155,12 +163,15 @@
   let importExportState = createImportExportState()
   let preferredThemeMode: ThemeMode | null = null
   let prefersReducedMotion = false
+  // 只在浏览器里创建：SSR/测试环境没有 document 和 URL.createObjectURL。
+  let customScriptController: CustomScriptController | null = null
   const categorySortState = createOptimisticSortState()
   const bookmarkSortState = createOptimisticSortState()
 
   configureDataService({
-    onRootError: (message) => {
+    onRootError: (message, error) => {
       rootError = message
+      lastDataError = error
     },
     onLocalSnapshotRestored: () => {
       revealHomeFromCurrentData()
@@ -220,20 +231,12 @@
       document.head.appendChild(styleTag);
     }
     styleTag.textContent = publicData?.settings?.custom_css ?? '';
-
-    // OD-01: Custom JS injection
-    let scriptTag = document.getElementById('custom-js-inject');
-    if (scriptTag) {
-      scriptTag.remove();
-    }
-    const jsContent = publicData?.settings?.custom_js ?? '';
-    if (jsContent.trim()) {
-      scriptTag = document.createElement('script');
-      scriptTag.id = 'custom-js-inject';
-      scriptTag.textContent = jsContent;
-      document.body.appendChild(scriptTag);
-    }
   }
+
+  // 自定义 JS 单独走一条响应式语句：上面那个块还依赖 activeTheme 和
+  // homeBackgroundStyle，写在里面的话切个主题就会把用户脚本重跑一遍。
+  // controller 内部还做了幂等，即使这条语句被多余触发也不会重复执行。
+  $: customScriptController?.apply(publicData?.settings?.custom_js)
 
   function setPreferredThemeMode(mode: ThemeMode): void {
     preferredThemeMode = mode
@@ -348,15 +351,23 @@
   async function enterInstalledApp(session: Awaited<ReturnType<typeof api.install.install>> | null): Promise<void> {
     await Promise.all([clearCachedAdminData(), clearCachedPublicData()])
     rememberInstalled(true)
-    authStore.setSession(session, session ? { username: session.username } : null)
+    authStore.setSession(session)
     replaceBrowserPath('/')
     installState = { type: 'checking' }
     await initializeApp(true)
   }
 
-  async function checkInstallStatus(): Promise<boolean> {
-    installState = { type: 'checking' }
+  async function checkInstallStatus(forceProbe = false): Promise<boolean> {
     const installedHint = hasInstalledHint(getInstallHintStorage())
+    const pathname = typeof window === 'undefined' ? '/' : window.location.pathname
+
+    // 浏览器已经记住装过时直接放行：这个探测过去无条件串行阻塞在数据加载之前，
+    // 每次打开页面白白多一个网络往返。标记过期的情况由 recheckInstallAfterDataError 兜底。
+    if (!shouldProbeInstallStatus({ installedHint, pathname, forceProbe })) {
+      return true
+    }
+
+    installState = { type: 'checking' }
 
     try {
       const status = await api.install.status()
@@ -394,6 +405,13 @@
     }
   }
 
+  // 跳过启动探测的代价：数据库被重置或重新绑定后，本地的「装过」标记会过期。
+  // 数据加载因服务端错误失败时回头复核一次，把用户带回安装页。
+  async function recheckInstallAfterDataError(error: unknown): Promise<boolean> {
+    if (!shouldRecheckInstallAfterDataError(error)) return false
+    return !await checkInstallStatus(true)
+  }
+
   async function handleInstall(value: { setupToken: string; username: string; password: string }): Promise<void> {
     if (installState.type !== 'pending' || installState.status.state !== 'needs_install') return
 
@@ -423,6 +441,7 @@
   async function initializeApp(installStatusKnown = false): Promise<void> {
     booting = true
     rootError = ''
+    lastDataError = null
 
     if (!installStatusKnown && !await checkInstallStatus()) {
       return
@@ -444,6 +463,7 @@
           adminStore.reset()
           await clearCachedAdminData()
         } else {
+          if (await recheckInstallAfterDataError(error)) return
           rootError = getErrorMessage(error)
         }
 
@@ -451,6 +471,7 @@
       }
     } else {
       await refreshPublicData(true)
+      if (rootError && await recheckInstallAfterDataError(lastDataError)) return
     }
 
     const homeGate = createHomeGateState({
@@ -889,6 +910,7 @@
 
   onMount(() => {
     preferredThemeMode = readPreferredThemeMode()
+    customScriptController = createCustomScriptController(createBrowserCustomScriptHost())
 
     if (typeof window !== 'undefined' && window.matchMedia) {
       prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -908,6 +930,8 @@
     if (mediaQuery && handleSystemThemeChange) {
       mediaQuery.removeEventListener('change', handleSystemThemeChange)
     }
+    // 不 revoke 的话每次重建都会漏一个 blob URL。
+    customScriptController?.destroy()
   })
 </script>
 

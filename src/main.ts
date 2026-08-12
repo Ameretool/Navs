@@ -1,5 +1,7 @@
 import './app.css'
 import { initErrorReporting } from './lib/errorMonitor'
+import { collectPrecacheAssetUrls, registerServiceWorker } from './lib/serviceWorkerClient'
+import { toastStore } from './lib/toast'
 import App from './App.svelte'
 
 initErrorReporting()
@@ -11,9 +13,15 @@ const app = new App({
 // PWA：仅在生产构建中注册 Service Worker（开发模式下避免缓存干扰热更新）
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {
-      // 注册失败不影响应用主体功能
-    })
+    void registerServiceWorker(
+      navigator.serviceWorker,
+      () => collectPrecacheAssetUrls(performance),
+      // 导航请求改成缓存优先后，部署新版本时用户这一次看到的仍是旧版。
+      // 主动提示可以把滞后窗口从「下次打开」缩短到「现在刷新一下」。
+      () => {
+        toastStore.addToast('已检测到新版本，刷新页面即可使用。', 'info', { duration: 10000 })
+      },
+    )
   })
 }
 

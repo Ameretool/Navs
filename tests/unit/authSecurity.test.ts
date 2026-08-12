@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { extractBearerToken, getSessionKey } from '../../worker/middleware/auth'
+import { extractBearerToken } from '../../worker/middleware/auth'
 import { getSessionTtlSeconds, isValidNewPassword } from '../../worker/routes/auth'
 
 describe('extractBearerToken', () => {
@@ -27,13 +27,6 @@ describe('extractBearerToken', () => {
   it('returns null when Bearer is present but token is empty', () => {
     expect(extractBearerToken('Bearer')).toBeNull()
     expect(extractBearerToken('Bearer  ')).toBeNull()
-  })
-})
-
-describe('getSessionKey', () => {
-  it('prepends the session prefix to the token', () => {
-    expect(getSessionKey('abc')).toBe('sess:abc')
-    expect(getSessionKey('')).toBe('sess:')
   })
 })
 

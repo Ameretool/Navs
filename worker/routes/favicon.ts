@@ -1,6 +1,5 @@
 import { Hono } from 'hono'
-import type { Context } from 'hono'
-import { ErrCode, type FaviconResp, type SiteMetaResp } from '../../shared/types'
+import type { FaviconResp, SiteMetaResp } from '../../shared/types'
 import {
   extractIconCandidates,
   fetchPageHtml,
@@ -10,20 +9,15 @@ import {
   pickBookmarkTitle,
 } from '../lib/pageMetadata'
 import { cacheResponse, getCachedResponse } from '../lib/iconResponses'
-import { fail, ok } from '../lib/response'
+import { ok } from '../lib/response'
+import { badRequest } from '../lib/routeHelpers'
 import type { HonoEnv } from '../types'
-
-type AppContext = Context<HonoEnv>
 
 const ICON_ACCEPT = 'image/avif,image/webp,image/apng,image/*,*/*;q=0.1'
 const OVERALL_DEADLINE_MS = 6000
 // 站点名称只需要一次页面抓取，不用像图标那样逐个探测候选，deadline 相应更短。
 const SITE_META_DEADLINE_MS = 4000
 const SITE_META_CACHE_SECONDS = 6 * 60 * 60
-
-function badRequest(c: AppContext, msg: string) {
-  return c.json(fail(ErrCode.BAD_REQUEST, msg))
-}
 
 async function canFetchIcon(url: string): Promise<boolean> {
   try {

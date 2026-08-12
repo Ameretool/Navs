@@ -35,6 +35,7 @@ export { getPublicDataSource, getAdminData } from './db/aggregates'
 export {
   getSettings,
   getSiteConfig,
+  getSiteConfigWithDataVersion,
   getSettingValues,
   setSettingValue,
   getDataVersion,

@@ -16,6 +16,9 @@ export interface Env {
 // Hono context.set/get 的类型
 export interface Variables {
   username: string
+  // 认证中间件校验通过的会话过期时间。退出登录用它算撤销名单的 TTL，
+  // 省掉一次重复的 JWT 校验和 KV 读取。
+  sessionExpiresAt: number
   loginRateLimitState: LoginRateLimitState | null
 }
 

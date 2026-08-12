@@ -7,7 +7,6 @@ import {
   clearAllSessions,
   clearCachedSession,
   extractBearerToken,
-  getSessionKey,
 } from '../middleware/auth'
 import { clearLoginFailures, getClientIp, loginRateLimit, recordLoginFailure } from '../middleware/rateLimit'
 import { ensureAdminBootstrap, type AdminCredentials } from '../lib/bootstrap'
@@ -15,6 +14,7 @@ import { hashPassword, verifyPassword } from '../lib/crypto'
 import { setSettingValue } from '../lib/db'
 import { fail, ok } from '../lib/response'
 import { createSession } from '../lib/session'
+import { revokeSession } from '../lib/sessionRevocation'
 import type { HonoEnv } from '../types'
 
 const ADMIN_PASSWORD_KEY = 'admin_password'
@@ -75,6 +75,16 @@ authRoutes.post('/login', loginRateLimit, async (c) => {
 authRoutes.post('/logout', authRequired, async (c) => {
   const token = extractBearerToken(c.req.header('Authorization'))
   if (token) {
+    // 清内存缓存只影响当前 isolate，JWT 本身在 exp 之前照样有效。
+    // 必须写撤销名单，否则「退出登录」在共享设备上等于什么都没做。
+    if (c.env.SESSION) {
+      try {
+        await revokeSession(c.env.SESSION, token, c.get('sessionExpiresAt'))
+      } catch {
+        // KV 不可用时不要让退出登录失败：前端仍会清掉本地登录态，
+        // token 也只是回到改动前的状态，不会变得更糟。
+      }
+    }
     clearCachedSession(token)
   }
   return c.json(ok(null))

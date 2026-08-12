@@ -3,8 +3,8 @@ import { ErrCode } from '../../shared/types'
 import { fail } from '../lib/response'
 import type { Env, HonoEnv, SessionValue } from '../types'
 import { getJwtSecret, verifyJwt, rotateJwtSecret } from '../lib/jwt'
+import { isSessionRevoked } from '../lib/sessionRevocation'
 
-const SESSION_PREFIX = 'sess:'
 const SESSION_MEMORY_CACHE_TTL_MS = 15_000
 const SESSION_MEMORY_CACHE_MAX = 256
 
@@ -20,10 +20,6 @@ export function extractBearerToken(authorization: string | undefined | null): st
   const match = authorization.match(/^Bearer\s+(.+)$/i)
   const token = match?.[1]?.trim()
   return token ? token : null
-}
-
-export function getSessionKey(token: string): string {
-  return `${SESSION_PREFIX}${token}`
 }
 
 function pruneSessionMemoryCache(now = Date.now()): void {
@@ -93,6 +89,14 @@ export async function validateSession(env: Env, token: string): Promise<SessionV
     return null
   }
 
+  // 撤销检查只在内存缓存未命中时走 KV，成本模型与既有的 session 缓存一致：
+  // 每个 isolate 每个 token 最多 15 秒一次读。代价是别的 isolate 上的 logout
+  // 最多 15 秒后才生效，这个窗口是刻意换来的，不要为了「立刻生效」去掉缓存。
+  if (env.SESSION && await isSessionRevoked(env.SESSION, token)) {
+    sessionMemoryCache.delete(token)
+    return null
+  }
+
   cacheValidatedSession(token, session)
   return session
 }
@@ -109,5 +113,6 @@ export const authRequired: MiddlewareHandler<HonoEnv> = async (c, next) => {
   }
 
   c.set('username', session.username)
+  c.set('sessionExpiresAt', session.exp)
   await next()
 }
