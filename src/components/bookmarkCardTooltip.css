@@ -23,7 +23,7 @@
   opacity: 0;
   pointer-events: none;
   transform: translate(-50%, 4px);
-  transition: opacity 0.16s ease, transform 0.16s ease;
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
 }
 
 .bookmark-tooltip-anchor:hover::after,

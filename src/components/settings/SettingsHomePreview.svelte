@@ -330,7 +330,7 @@
     font: inherit;
     font-size: 12px;
     cursor: pointer;
-    transition: background 160ms ease, color 160ms ease;
+    transition: background var(--transition-fast), color var(--transition-fast);
   }
 
   .preview-theme-switch button.active {
@@ -575,7 +575,7 @@
     border: 1px solid color-mix(in srgb, var(--theme-accent-color, #2563eb) 20%, transparent);
     border-radius: 10px;
     padding: 5px;
-    transition: width 180ms ease;
+    transition: width var(--transition-base);
   }
 
   .preview-nav-left.expanded {

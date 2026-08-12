@@ -12,9 +12,13 @@
 
 ## 鉴权规则
 
-- `authRequired`：读取 Bearer token，查 KV session；无效时返回 401。
+- `authRequired`：读取 Bearer token，用 `settings.jwt_secret` 校验 HS256 签名和 `exp`；再查 KV 撤销名单；任一不通过返回 401。校验结果在单个 Worker isolate 内缓存 15 秒，命中缓存时不读 KV。
+- 会话是无状态 JWT，payload 为 `{ username, exp, jti }`。`jti` 保证同一毫秒内的两次登录也会签出不同 token，否则「退出这台设备」会连带撤销另一台。
+- `POST /api/logout` 把当前 token 的 SHA-256 摘要写入 KV `revoked:<sha256>`，TTL 为该 token 的剩余寿命。用摘要而不是 token 本身做 key，避免 KV 被 dump 时泄露仍在有效期内的 token。**其它 isolate 上最多 15 秒后才感知到撤销**，这是内存缓存换来的固定窗口。
+- 修改密码和凭据重置走 `rotateJwtSecret`，一次性作废全部会话。
+- KV `SESSION` 绑定当前只用于登录限流（`rl:login:*`）、点击计数限流（`rl:click:*`）和会话撤销名单（`revoked:*`），不再存储会话本身。
 - `/api/public/data`：匿名请求默认可查公开数据 edge cache；缓存未命中时先复用 `/api/config` edge cache，仍未命中才读取轻量 `site_title/public_mode`，公开模式关闭则要求有效 token，否则返回 `code=1005`，该轻量 1005 响应也会短时写入 edge cache。请求带 `Cache-Control: no-cache`、`Cache-Control: no-store`、`Cache-Control: max-age=0` 或 `Pragma: no-cache` 时，服务端必须绕过公开数据和站点配置 edge cache。
-- `/api/data/version`：读取内部 `settings.data_version`，返回轻量版本号；公开模式关闭时匿名请求返回 `code=1005` 并携带轻量站点配置，登录态请求需通过 token 校验。
+- `/api/data/version`：用一次 `settings` 查询同时读取 `site_title`、`public_mode` 和内部 `data_version`，返回轻量版本号；公开模式关闭时匿名请求返回 `code=1005` 并携带轻量站点配置，登录态请求需通过 token 校验。这是每次页面加载都会走的热路径，查询条数是契约。
 
 ## 公开接口
 
@@ -27,7 +31,7 @@
 | POST | `/api/public/bookmarks/:id/click` | 无 | `null` |
 | POST | `/api/error-report` | 无 | `{ received: number }` |
 
-`/api/config` 使用短 TTL Cloudflare edge cache，设置保存或数据导入后会主动失效，主要作为兼容和兜底轻量配置接口。前端普通启动路径优先使用本地快照加 `/api/data/version` 做远端确认；本地无可用快照或版本变化时，才请求 `/api/public/data` 或 `/api/admin/data` 派生站点配置。公开模式关闭时，匿名 `/api/public/data` 的 1005 响应会在 `data` 中携带 `{ site_title, public_mode: false }`，登录页无需再额外请求 `/api/config`。该 1005 响应使用浏览器 `max-age=0` 和短 edge TTL，避免本地浏览器缓存卡住公开模式切换，同时减少私有站点匿名访问对 D1 的重复读取。`/api/public/data` 只查询并返回首页渲染需要的公开设置、分类和书签字段，书签公开字段包含用于本地优先图标展示的 `icon_blob`，但不包含 `admin_username`、`admin_password`、`public_mode`、`custom_css`、`custom_js` 等内部或未使用设置字段，也不包含分类/书签的 `created_at` 管理字段；未携带 no-cache 指令的匿名公开访问会先查短 TTL edge cache，命中时直接返回而不读取 D1。前端拉取完整聚合数据时默认带 `Cache-Control: no-cache`、`Pragma: no-cache` 和 fetch `cache: "no-store"`；服务端收到 no-cache 指令或带登录态请求时会绕过匿名缓存。缓存未命中时，服务端先复用或预热 `/api/config` 的轻量 edge cache 来判断是否公开，公开时再通过一次 D1 batch 聚合读取公开 settings、分类和书签；如果同一请求刚从 D1 读取过 `site_title/public_mode`，公开 settings 查询会跳过这两行并把已知值合并回响应。
+`/api/config` 使用短 TTL Cloudflare edge cache，设置保存或数据导入后会主动失效，主要作为兼容和兜底轻量配置接口。前端普通启动路径优先使用本地快照加 `/api/data/version` 做远端确认；本地无可用快照或版本变化时，才请求 `/api/public/data` 或 `/api/admin/data` 派生站点配置。公开模式关闭时，匿名 `/api/public/data` 的 1005 响应会在 `data` 中携带 `{ site_title, public_mode: false }`，登录页无需再额外请求 `/api/config`。该 1005 响应使用浏览器 `max-age=0` 和短 edge TTL，避免本地浏览器缓存卡住公开模式切换，同时减少私有站点匿名访问对 D1 的重复读取。`/api/public/data` 只查询并返回首页渲染需要的公开设置、分类和书签字段，书签公开字段包含用于本地优先图标展示的 `icon_blob`，但不包含 `admin_username`、`admin_password` 等内部字段，也不包含分类/书签的 `created_at`。**注意 `custom_css` 与 `custom_js` 属于公开设置**（见 `shared/settings.ts` 的 `PUBLIC_SETTINGS_KEYS`）：它们会随公开数据下发给每个匿名访客并在其浏览器中生效，这是「自定义 CSS/JS」这个功能的预期行为；未携带 no-cache 指令的匿名公开访问会先查短 TTL edge cache，命中时直接返回而不读取 D1。前端拉取完整聚合数据时默认带 `Cache-Control: no-cache`、`Pragma: no-cache` 和 fetch `cache: "no-store"`；服务端收到 no-cache 指令或带登录态请求时会绕过匿名缓存。缓存未命中时，服务端先复用或预热 `/api/config` 的轻量 edge cache 来判断是否公开，公开时再通过一次 D1 batch 聚合读取公开 settings、分类和书签；如果同一请求刚从 D1 读取过 `site_title/public_mode`，公开 settings 查询会跳过这两行并把已知值合并回响应。
 
 `/api/error-report` 接收前端运行时错误上报，payload 为 `{ errors: ErrorReportEntry[] }` 或单个 `ErrorReportEntry`。该接口不要求登录，但限制请求体为 16 KB、单批最多 10 条，并对消息、分类、URL 和行列字段做类型与长度归一化；有效请求通过 D1 原子计数按来源 IP 限制为每分钟 12 次，已封禁来源可由当前 Worker isolate 内存快速拒绝。超大请求返回 HTTP 413，高频请求返回 HTTP 429，无效 JSON 或无有效条目返回 HTTP 400。Worker 只把有限字段写入 `console.error`，响应中的 `received` 表示实际接收条数；前端会对同一错误做 60 秒去重，且上报失败不得影响页面主流程。
 
@@ -53,6 +57,7 @@
 
 全新部署通过 `/install` 初始化管理员：`POST /api/install` 使用 `SETUP_TOKEN` 授权，并将管理员密码通过 WebCrypto PBKDF2 哈希后以 `salt:hash` 形式存入 `settings.admin_password`。`INIT_ADMIN_USER`、`INIT_ADMIN_PASSWORD` 和初始化凭据标记仅用于已有旧数据库的升级或凭据恢复：修改兼容变量后，下一次登录会同步更新 D1 中的管理员凭据；后台账号安全修改后的密码不会被未变化的初始化变量覆盖。旧数据库可通过新的 `RESET_ADMIN_CREDENTIALS` 标记执行一次强制重置。
 `LoginResp` 包含 `token`、`expires_at` 和 `username`，前端登录成功后直接使用返回的 `username` 更新登录态并停留/返回前台首页，不再额外请求 `/api/me` 或立即预加载后台分包。登录接口会在 bootstrap 初始化时用一次 settings 查询同时读取管理员账号和密码，并复用该结果进行密码校验，避免重复读取账号/密码设置。已有登录态刷新页面时会先恢复本地 session 和可能存在的 `AdminData` 快照，再请求 `/api/data/version` 确认远端版本；版本变化时才请求 `/api/admin/data`。只有显式刷新用户信息时才需要 `/api/me`。
+`POST /api/logout` 会把当前 token 写入 KV 撤销名单，之后该 token 立即失效（同 isolate 立即生效，其它 isolate 最多 15 秒）。前端同时清除本地登录态。
 
 ## 后台聚合接口
 
@@ -98,9 +103,35 @@
 
 `POST /api/bookmarks/:id/icon-cache/refresh` 会按当前书签图标和 `icon_source` 刷新可持久化图标缓存：普通 HTTP(S) 图标在短超时时间内尝试写入 `bookmarks.icon_blob` 并返回 data URI，data URI 图标原样写入；Iconify、logo_surf 或非持久化来源会清空或跳过 `icon_blob`。前端只在编辑、保存等显式刷新动作调用该接口；编辑弹窗会先打开，再在后台触发刷新并把返回的 `icon_blob` 同步写入浏览器本地缓存。普通 HTTP(S) 图标抓取超时或失败时接口会尽快返回已有 `icon_blob` 或 `null`，前端可继续使用已保存的原始图标 URL 作为显示兜底。
 
-批量删除请求最多包含 500 个正整数 ID；服务端会去重并忽略已不存在的记录。书签写入可携带 `description_mode: "always" | "hover" | "hidden" | null`；更新时省略该字段会保留原覆盖值，显式 `null` 会恢复跟随全局设置。
+批量删除请求最多包含 500 个正整数 ID；排序请求的 `ids` 最多 5000 个；服务端会去重并忽略已不存在的记录。书签 `url` 必须是 `http(s)` 地址，其它协议返回 `code=1002`；后台表单会先把缺协议的写法（`example.com`）补成 `https://` 再提交，补不了的原样送出由服务端拒绝。书签写入可携带 `description_mode: "always" | "hover" | "hidden" | null`；更新时省略该字段会保留原覆盖值，显式 `null` 会恢复跟随全局设置。
 
 `POST /api/bookmarks/check-health` 最多检查请求中的前 20 个书签，Worker 先用 HEAD 请求目标地址，遇到 405、403 或 400 时回退 GET，单个目标超时为 3 秒，返回 HTTP 状态码、`ok`、`timeout` 或 `error`。
+
+## 站点信息接口
+
+| 方法 | 路径 | 鉴权 | 返回 |
+| --- | --- | --- | --- |
+| GET | `/api/fetch-site-meta?url=` | 登录 | `SiteMetaResp` |
+
+新增书签时用于自动解析站点名称。服务端抓取目标页并解析标题，**接口不会失败**：非法 `url` 返回 `code=1002`，其余任何情况（抓取超时、非 HTML、反爬拦截、解码失败）都返回 `code=0`，`title` 退回去掉 `www.` 前缀的域名。
+
+名称按用户输入的地址判断意图：`url` 指向根路径（`/`、空路径或 `index.html` 一类默认文档）时优先取 `og:site_name`，再依次尝试 `og:title`、`twitter:title`、`<title>`；深层链接则优先 `og:title`，再依次 `twitter:title`、`<title>`、`og:site_name`。根/深层的判定使用请求地址而非重定向落点，因为它代表用户的收藏意图。**域名兜底同样使用请求地址**：需要登录的站点（如 `mail.google.com`）会被跳转到登录域，用落点域名当书签名没有意义。
+
+解析结果会做归一化：解码 HTML 实体（单次扫描，不会把 `&amp;lt;` 二次解码）、折叠空白、剥离控制字符与零宽/双向控制符、按 Unicode 码位截断到 80。占位、反爬和登录页标题（`Untitled`、`无标题`、`404 Not Found`、`Just a moment...`、`Sign in - Google Accounts`、`登录 - 知乎` 等）以及解码失败（含 U+FFFD）的候选会被跳过并继续尝试下一来源，全部失败才用域名兜底。登录页判定刻意保守：只在整个标题就是登录字样、或登录字样后紧跟分隔符时命中，`Login Manager 使用手册` 这类正常标题不会被误判。
+
+页面抓取共用 `worker/lib/pageMetadata.ts`：单次请求 3 秒超时，整体 4 秒 deadline，按 BOM → `Content-Type` charset → `<meta charset>` 的顺序选择解码器，因此 GBK/GB2312/Big5 等非 UTF-8 页面也能解出正确标题；不支持的 charset label 回退 UTF-8。目标地址中内嵌的账号密码会在请求前剥离。
+
+响应体采用流式读取：标题和 og 标签都在 `<head>` 内，读到 `</head>` 即停止拉取后续分片并断开连接，最多读取 128KB，因此不会为了一个标题下载整页内容。`/api/fetch-favicon` 的 `<link rel="icon">` 解析共用同一条路径，同样只读 `<head>`。
+
+解析成功的结果会写入 Cloudflare edge cache（6 小时，按目标地址建合成缓存键，不含 `Authorization`），重复解析同一地址直接命中缓存。**域名兜底的结果不写缓存**，避免一次抓取失败或被拦截后，用户重试时长时间拿到同一个坏结果。
+
+出网目标过滤：`/api/fetch-site-meta` 与 `/api/fetch-favicon` 共用 `parseTargetUrl`，拒绝指向环回、私有、链路本地（含云元数据 `169.254.169.254`）、运营商级 NAT、组播保留段的 IPv4/IPv6 字面量，以及 `localhost`、`*.local`、`*.internal`、`metadata.google.internal` 等内部主机名，被拒绝时返回 `code=1002`。`favicon` 解析出的 `<link rel="icon">` 候选来自第三方页面，同样经过该过滤，避免恶意页面绕过入口检查。该防线只检查地址字面量：`new URL()` 会先把 `2130706433`、`0x7f.0.0.1` 一类写法归一成点分形式，因此常见进制绕过已被拉平，但它**挡不住 DNS 重绑定**（合法域名解析到内网），Workers 没有可插手的解析钩子。
+
+前端只在**新增**书签、书签标题为空、且网址输入框失焦时调用该接口；返回后会再次确认标题仍为空才写入，请求在途期间用户已输入标题则丢弃结果。写入表单前按字素簇截断到 20 个字符（复用 `src/lib/truncateUnicodeText.ts`，与后台列表一致），超长时以 `…` 结尾，避免标题输入框内容超出可视范围不便修改；接口本身仍返回最长 80 个字符的完整结果。
+
+需要注意接口的能力边界：它只解析服务端返回的静态 HTML。由 JavaScript 在页面加载后改写的标题（常见于 SPA，例如静态 `<title>` 是模板默认值、真实站点名由前端调接口取回后再设置）无法获取，这类站点只能拿到静态 HTML 里的原始标题，需要用户手动修改。
+
+因为这是用户没有主动触发的后台请求，前端调用时带 `keepSessionOnUnauthorized`：接口返回 401 或 `code=1001` 时**不清除本地登录态**，避免 token 恰好过期时把用户正在填写、尚未保存的书签表单一起丢掉。用户主动发起的请求仍然按原有规则清除登录态。
 
 ## 图标接口
 
@@ -154,6 +185,8 @@ HTTP(S) 图标抓取成功后，代理会直接返回图片字节并写入 Cloud
 
 设置存储在 D1 `settings` 表中，`value` 为 JSON 字符串。后端读取时聚合为完整 `Settings` 对象，并对缺失字段使用默认值。后台设置面板提交完整 `Settings` 字段时，`PUT /api/settings` 写入 D1 后直接用本次提交的 payload 和默认值合成响应，避免额外回读 settings 全表；只提交部分字段的兼容请求仍会写入后读取完整 `Settings` 返回。
 
+字符串设置项有长度上限，超出返回 `code=1002` 且 msg 中包含字段名与上限值。按 Unicode 码位计数（含 emoji 的标题不会被误判）：`site_title` 200；`site_title_color` / `card_background_color` / `card_text_color` / `background.maskColor` 各 64；`image_host_url` 2048；`custom_css` / `custom_js` / `footer_html` 各 65536；`background.value` 与 `backgrounds.light|dark.value` 各 262144。背景值的上限尤其重要：它会随 `toPublicSettings` 进入每个访客的 `/api/public/data`，不限长会直接破坏性能契约中「聚合数据保持轻量」的约定。
+
 `navigation` 是公开设置对象，结构为 `{ position: 'left' | 'top', always_expanded: boolean }`。缺失或非法的 D1 历史值读取时回退为 `{ position: 'left', always_expanded: false }`；更新接口拒绝未知位置或非布尔 `always_expanded`。`always_expanded` 只控制桌面左侧布局，顶部和移动端不会应用该值，但后台切换布局时会保留原配置。
 
 背景配置保留旧版 `background` 字段作为兼容值，并新增 `backgrounds.light` / `backgrounds.dark` 分别保存浅色和深色主题的背景类型、背景值、模糊度、遮罩透明度和遮罩颜色。公开首页渲染时按当前实际主题优先读取 `backgrounds` 中对应配置；旧备份或旧数据库缺少 `backgrounds` 时，后端会用旧 `background` 自动派生两套背景。
@@ -174,6 +207,6 @@ HTTP(S) 图标抓取成功后，代理会直接返回图片字节并写入 Cloud
 | --- | --- | --- | --- | --- |
 | POST | `/api/import` | 登录 | `ImportReq` | `ImportResp` |
 
-`ImportReq.mode` 支持 `replace` 和 `merge`。旧备份缺少 `parent_id` 时按一级分类处理。合并模式按去除首尾空格、忽略大小写的完整分类路径复用现有分类，因此不同父分类下允许同名子分类；重复 URL 保留，当前站点设置保持不变。
+`ImportReq.mode` 支持 `replace` 和 `merge`。单次导入最多 2000 个分类、20000 个书签，超出返回 `code=1002` 并在 msg 中给出上限。协议不合规的书签会被**跳过而不是让整批导入失败**——为了一条 `javascript:` 小书签让整次备份恢复失败是更糟的结果：缺协议的写法补成 `https://` 保留，`javascript:` / `data:` / `file:` / `ftp:` 等一律丢弃并计入 `ImportResp.skipped_bookmarks`。旧备份缺少 `parent_id` 时按一级分类处理。合并模式按去除首尾空格、忽略大小写的完整分类路径复用现有分类，因此不同父分类下允许同名子分类；重复 URL 保留，当前站点设置保持不变。
 
 导入在写入前验证分类深度、父级引用和书签分类引用。覆盖和合并都会先建立旧分类 ID 到新分类 ID 的映射，按一级分类、二级分类、书签的顺序重建，并同时重写二级分类 `parent_id` 与书签 `category_id`。设置仅在覆盖导入中写入受支持的公开配置 key，不触碰管理员账号字段。`ImportResp` 包含导入数量和导入后的 `AdminData`，前端使用该响应更新本地数据并显式同步导入状态。

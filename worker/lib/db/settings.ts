@@ -1,7 +1,6 @@
 // settings 聚合读取、单键读写、data_version 维护与部分更新
 
 import { type Settings, type SiteConfig } from '../../../shared/types'
-import { SETTINGS_KEYS } from '../../../shared/settings'
 import {
   DEFAULT_SETTINGS,
   readRawSettingsRows,
@@ -25,12 +24,32 @@ export async function getSiteConfig(db: D1Database): Promise<SiteConfig> {
     .prepare("SELECT key, value FROM settings WHERE key IN ('site_title', 'public_mode')")
     .all<{ key: string; value: string | null }>()
 
+  return siteConfigFromRows(results ?? [])
+}
+
+// `/api/data/version` 是每次页面加载都会走的热路径，之前它先 getSiteConfig 再
+// getDataVersion，两条串行的 D1 往返读的都是 settings 表。合并成一条。
+export async function getSiteConfigWithDataVersion(
+  db: D1Database,
+): Promise<{ config: SiteConfig; version: string }> {
+  const { results } = await db
+    .prepare(`SELECT key, value FROM settings WHERE key IN ('site_title', 'public_mode', '${DATA_VERSION_KEY}')`)
+    .all<{ key: string; value: string | null }>()
+
+  const rows = results ?? []
+  return {
+    config: siteConfigFromRows(rows),
+    version: dataVersionFromValue(rows.find((row) => row.key === DATA_VERSION_KEY)?.value ?? null),
+  }
+}
+
+function siteConfigFromRows(rows: Array<{ key: string; value: string | null }>): SiteConfig {
   const config: SiteConfig = {
     site_title: DEFAULT_SETTINGS.site_title,
     public_mode: DEFAULT_SETTINGS.public_mode,
   }
 
-  for (const row of results ?? []) {
+  for (const row of rows) {
     if (row.value == null) continue
 
     try {
@@ -90,14 +109,19 @@ export async function getDataVersion(db: D1Database): Promise<string> {
     .prepare('SELECT value FROM settings WHERE key = ?')
     .bind(DATA_VERSION_KEY)
     .first<{ value: string | null }>()
-  if (!row?.value) return '0'
+
+  return dataVersionFromValue(row?.value ?? null)
+}
+
+function dataVersionFromValue(raw: string | null): string {
+  if (!raw) return '0'
 
   try {
-    const parsed = JSON.parse(row.value) as unknown
+    const parsed = JSON.parse(raw) as unknown
     if (typeof parsed === 'string' && parsed) return parsed
     if (typeof parsed === 'number' && Number.isFinite(parsed)) return String(parsed)
   } catch {
-    if (row.value) return row.value
+    return raw
   }
 
   return '0'

@@ -435,7 +435,7 @@
     color: var(--admin-text);
     background: var(--admin-input-bg);
     font-family: inherit;
-    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
   }
 
   .admin-bookmark-search-bar input:focus {

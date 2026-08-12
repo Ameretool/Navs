@@ -132,7 +132,7 @@
     grid-template-columns: auto minmax(0, 1fr);
     gap: 16px;
     border: 1px solid var(--confirm-border);
-    border-radius: 22px;
+    border-radius: var(--radius-xl);
     padding: 20px;
     background: var(--confirm-surface);
     box-shadow: var(--confirm-shadow);
@@ -208,6 +208,13 @@
     line-height: 1.6;
   }
 
+  /* 导入确认里会用换行把「这份备份包含可执行内容」单独成段，
+     不保留换行的话那段警告会和前面的统计文字挤成一团，等于没提示。
+     pre-line 只保留换行，其余空白仍然折叠。 */
+  #confirm-dialog-description {
+    white-space: pre-line;
+  }
+
   .confirm-target {
     display: grid;
     gap: 4px;
@@ -242,18 +249,18 @@
   button {
     min-width: 86px;
     min-height: 38px;
-    border-radius: 12px;
-    padding: 8px 14px;
+    border-radius: var(--radius-lg);
+    padding: var(--control-padding-md);
     font: inherit;
-    font-size: 14px;
+    font-size: var(--font-size-base);
     font-weight: 700;
     cursor: pointer;
     transition:
-      border-color 0.16s ease,
-      background 0.16s ease,
-      color 0.16s ease,
-      transform 0.12s ease,
-      box-shadow 0.16s ease;
+      border-color var(--transition-fast),
+      background var(--transition-fast),
+      color var(--transition-fast),
+      transform var(--transition-fast),
+      box-shadow var(--transition-fast);
   }
 
   button:disabled {

@@ -405,7 +405,7 @@
     border: 1px solid var(--admin-card-border);
     border-radius: 12px;
     background: var(--admin-card-bg);
-    transition: border-color 0.15s ease;
+    transition: border-color var(--transition-fast);
   }
 
   .admin-compact-card:hover {
@@ -458,7 +458,7 @@
     height: 1.5px;
     border-radius: 999px;
     background: currentColor;
-    transition: transform 0.16s ease;
+    transition: transform var(--transition-fast);
   }
 
   .admin-tree-chevron::before {
@@ -555,7 +555,7 @@
     padding: 3px 10px;
     font-size: 12px;
     cursor: pointer;
-    transition: 0.15s ease;
+    transition: var(--transition-fast);
     border: 1px solid var(--admin-input-border);
     background: var(--admin-card-bg);
     color: var(--admin-text);

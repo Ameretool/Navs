@@ -305,6 +305,13 @@ export interface FaviconResp {
   icon: string // 解析到的“直接”图标 URL（方式1；失败回退 Google）
 }
 
+// GET /api/fetch-site-meta?url=...
+// 新增书签时解析站点名称。接口不会失败：解析不出来时 title 为去掉 www. 的域名。
+export interface SiteMetaResp {
+  title: string // 站点名称：根地址优先 og:site_name，深层链接优先 og:title/<title>
+  final_url: string // 跟随重定向后的最终地址
+}
+
 // GET /api/iconify-search?query=...
 export interface IconifyCandidate {
   name: string

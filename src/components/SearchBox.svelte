@@ -252,9 +252,9 @@
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
     text-align: left;
     transition:
-      border-color 0.18s ease,
-      background-color 0.18s ease,
-      box-shadow 0.18s ease;
+      border-color var(--transition-base),
+      background-color var(--transition-base),
+      box-shadow var(--transition-base);
   }
 
   .engine-icon-button:hover:not(:disabled),
@@ -308,7 +308,7 @@
     border-bottom: 1.5px solid currentColor;
     opacity: 0.62;
     transform: translateY(-0.12rem) rotate(45deg);
-    transition: transform 0.18s ease;
+    transition: transform var(--transition-base);
   }
 
   .engine-icon-button[aria-expanded='true'] .engine-chevron {

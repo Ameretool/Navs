@@ -48,3 +48,58 @@ describe('asset response headers', () => {
     expect(headersFile).toContain('Cache-Control: no-cache, max-age=0, must-revalidate')
   })
 })
+
+describe('content security policy', () => {
+  function csp(): string {
+    return applyHeaders('/', new Response('<!doctype html>', {
+      headers: { 'Content-Type': 'text/html; charset=utf-8' },
+    })).headers.get('Content-Security-Policy') ?? ''
+  }
+
+  it('allows cross-origin iframes for the in-page bookmark modal', () => {
+    // 不声明 frame-src 会回落到 default-src 'self'，
+    // 「当前页弹层」打开方式点开就只有空白弹层。
+    expect(csp()).toContain('frame-src https:')
+  })
+
+  it('allows blob scripts but never inline ones', () => {
+    // 自定义 JS 走 blob URL + script.src，不是 script.textContent，
+    // 所以不需要 'unsafe-inline'。要拿到 blob URL 必须先能执行脚本，
+    // 只能注入 HTML 的攻击者（例如通过 footer_html）用不上 blob:。
+    const value = csp()
+
+    expect(value).toContain("script-src 'self' blob:")
+    expect(value).not.toContain("'unsafe-inline' blob:")
+    expect(value.match(/script-src[^;]*/)?.[0]).not.toContain('unsafe-inline')
+  })
+
+  it('keeps inline event handlers and javascript: urls blocked', () => {
+    // footer_html 走 {@html}，里面的 onerror= / javascript: 只能靠 script-src 拦。
+    // 这条断言的存在是为了让「顺手加个 unsafe-inline」立刻失败。
+    const scriptSrc = csp().match(/script-src[^;]*/)?.[0] ?? ''
+
+    expect(scriptSrc).toBe("script-src 'self' blob:")
+  })
+
+  it('closes the form-submission exfiltration channel', () => {
+    // form-action 不回落到 default-src，不声明等于不限制。
+    expect(csp()).toContain("form-action 'self'")
+  })
+
+  it('keeps the directives that scripts do not affect', () => {
+    const value = csp()
+
+    expect(value).toContain("default-src 'self'")
+    expect(value).toContain("object-src 'none'")
+    expect(value).toContain("base-uri 'self'")
+    expect(value).toContain("frame-ancestors 'none'")
+    expect(value).toContain("connect-src 'self'")
+  })
+
+  it('keeps the bookmark url allowlist as defence in depth', async () => {
+    const { isAllowedBookmarkUrl } = await import('../../shared/urlPolicy')
+
+    expect(isAllowedBookmarkUrl('javascript:alert(1)')).toBe(false)
+    expect(isAllowedBookmarkUrl('https://example.com')).toBe(true)
+  })
+})

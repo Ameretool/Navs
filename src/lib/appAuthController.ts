@@ -9,7 +9,8 @@ export interface AuthUIRegion {
  * Target UI state after clicking "open login" button.
  * Always opens the modal; changes view to 'login' only when the home is not visible.
  */
-export function targetAfterLoginOpen(canSeeHome: boolean, currentView: AppView): AuthUIRegion {
+// currentView 保留在签名里是为了让调用点读起来完整，但结果只取决于 canSeeHome。
+export function targetAfterLoginOpen(canSeeHome: boolean, _currentView: AppView): AuthUIRegion {
   return {
     loginModalOpen: true,
     currentView: canSeeHome ? null : 'login',

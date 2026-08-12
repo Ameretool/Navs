@@ -40,11 +40,11 @@
   .primary-button,
   .ghost-button,
   .danger-button {
-    border-radius: 10px;
-    padding: 7px 12px;
-    font-size: 13px;
+    border-radius: var(--radius-lg);
+    padding: var(--control-padding-sm);
+    font-size: var(--font-size-md);
     cursor: pointer;
-    transition: 0.18s ease;
+    transition: var(--transition-base);
   }
 
   .primary-button {

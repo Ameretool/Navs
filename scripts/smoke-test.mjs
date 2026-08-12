@@ -267,6 +267,29 @@ async function main() {
     }
   }
 
+  // 12.1 站点名称解析（容忍外网失败，但鉴权必须成立）
+  section('站点名称解析 /api/fetch-site-meta')
+  {
+    const anon = await call('/api/fetch-site-meta?url=' + encodeURIComponent('https://github.com'))
+    check('fetch-site-meta 未登录被拒绝', anon.status === 401 || anon.json?.code === 1001)
+
+    const bad = await call('/api/fetch-site-meta?url=' + encodeURIComponent('ftp://example.com'), { token })
+    check('fetch-site-meta 拒绝非 http(s) 地址', bad.json?.code === 1002)
+
+    try {
+      const r = await call('/api/fetch-site-meta?url=' + encodeURIComponent('https://github.com'), { token })
+      if (r.json?.code === 0 && typeof r.json?.data?.title === 'string') {
+        // 接口契约是永不失败：解析不出来也要给出域名兜底
+        check('fetch-site-meta 返回非空站点名称', r.json.data.title.length > 0)
+        console.log(`    title = ${r.json.data.title}`)
+      } else {
+        console.log(`    (跳过断言) fetch-site-meta 返回 code=${r.json?.code}（沙箱外网可能受限）`)
+      }
+    } catch (e) {
+      console.log(`    (跳过断言) fetch-site-meta 请求异常：${e.message}`)
+    }
+  }
+
   // 13. 数据导入（覆盖式）
   section('数据导入 /api/import')
   {

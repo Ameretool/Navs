@@ -179,7 +179,7 @@
     font: inherit;
     text-align: left;
     cursor: pointer;
-    transition: border-color 180ms ease, background 180ms ease;
+    transition: border-color var(--transition-base), background var(--transition-base);
   }
 
   .advanced-toggle:hover {
@@ -219,7 +219,7 @@
     color: var(--sp-muted);
     font-size: 24px;
     transform: rotate(90deg);
-    transition: transform 180ms ease;
+    transition: transform var(--transition-base);
   }
 
   .advanced-chevron.open {

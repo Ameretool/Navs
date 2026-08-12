@@ -205,17 +205,17 @@
 
   .ghost-button {
     border: 1px solid var(--sp-input-border);
-    border-radius: 10px;
+    border-radius: var(--radius-lg);
     background: var(--sp-input-bg);
     color: var(--sp-text);
-    padding: 10px 16px;
-    font-size: 14px;
+    padding: var(--control-padding-md);
+    font-size: var(--font-size-base);
     cursor: pointer;
     transition:
-      border-color 0.18s ease,
-      background 0.18s ease,
-      color 0.18s ease,
-      transform 0.18s ease;
+      border-color var(--transition-base),
+      background var(--transition-base),
+      color var(--transition-base),
+      transform var(--transition-base);
     white-space: nowrap;
   }
 
@@ -232,16 +232,16 @@
     width: 100%;
     box-sizing: border-box;
     border: 1px solid var(--sp-input-border);
-    border-radius: 10px;
-    padding: 9px 11px;
-    font-size: 14px;
+    border-radius: var(--radius-lg);
+    padding: var(--control-padding-input);
+    font-size: var(--font-size-base);
     color: var(--sp-input-text);
     background: var(--sp-input-bg);
     font-family: inherit;
     transition:
-      border-color 0.18s ease,
-      box-shadow 0.18s ease,
-      background 0.18s ease;
+      border-color var(--transition-base),
+      box-shadow var(--transition-base),
+      background var(--transition-base);
   }
 
   input:focus {

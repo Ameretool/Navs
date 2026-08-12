@@ -54,7 +54,26 @@ export function cacheResponse(context: unknown, request: Request, response: Resp
   executionCtx?.waitUntil(edgeCache.put(request, response.clone()))
 }
 
-export async function getCachedIconResponse(request: Request): Promise<Response | undefined> {
+// 图标代理是匿名可访问的，而 edge cache 的键是整个请求 URL。不归一化的话
+// `/api/icon/1?v=<随机>` 每次都是新键、必然 miss，于是每个请求都要走一次 D1 读取，
+// 书签还没有 icon_blob 时还会额外触发一次最长 5 秒的外站抓取——不需要任何凭据
+// 就能放大的资源消耗路径。
+//
+// 前端确实用 `?v=` 做图标更新后的缓存失效，所以不能简单丢掉整个 query：
+// 保留形如版本号的 `v`，其余参数（包括超长随机串）一律并到同一个缓存条目上。
+const ICON_CACHE_VERSION = /^[A-Za-z0-9_.:-]{1,64}$/
+
+export function iconCacheKey(request: Request): Request {
+  const url = new URL(request.url)
+  const version = url.searchParams.get('v')
+  url.search = ''
+  if (version && ICON_CACHE_VERSION.test(version)) {
+    url.searchParams.set('v', version)
+  }
+  return new Request(url.toString(), { method: 'GET' })
+}
+
+export async function getCachedResponse(request: Request): Promise<Response | undefined> {
   const edgeCache = (caches as unknown as { default: Cache }).default
   return (await edgeCache.match(request)) ?? undefined
 }

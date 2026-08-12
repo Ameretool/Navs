@@ -337,8 +337,8 @@
     justify-content: center;
     gap: 0.34rem;
     transition:
-      transform 0.16s ease,
-      border-color 0.16s ease;
+      transform var(--transition-fast),
+      border-color var(--transition-fast);
   }
 
   .add-link-button.ghost {

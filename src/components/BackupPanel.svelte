@@ -230,7 +230,7 @@
     padding: 10px 16px;
     font-size: 14px;
     cursor: pointer;
-    transition: 0.18s ease;
+    transition: var(--transition-base);
   }
 
   .primary-button {

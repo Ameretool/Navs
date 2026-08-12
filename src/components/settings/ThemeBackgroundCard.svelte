@@ -265,7 +265,7 @@
     color: var(--sp-muted);
     font-size: 12px;
     cursor: pointer;
-    transition: background 160ms ease, color 160ms ease;
+    transition: background var(--transition-fast), color var(--transition-fast);
   }
 
   .background-type-options label.active {
@@ -339,9 +339,9 @@
     background-color: var(--sp-input-bg);
     font-family: inherit;
     transition:
-      border-color 0.18s ease,
-      box-shadow 0.18s ease,
-      background 0.18s ease;
+      border-color var(--transition-base),
+      box-shadow var(--transition-base),
+      background var(--transition-base);
   }
 
   input[type='range'] {
@@ -376,10 +376,10 @@
     font-size: 14px;
     cursor: pointer;
     transition:
-      border-color 0.18s ease,
-      background 0.18s ease,
-      color 0.18s ease,
-      transform 0.18s ease;
+      border-color var(--transition-base),
+      background var(--transition-base),
+      color var(--transition-base),
+      transform var(--transition-base);
     white-space: nowrap;
   }
 

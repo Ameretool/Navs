@@ -1,28 +1,15 @@
 import { Hono } from 'hono'
-import type { Context } from 'hono'
 import { BUILTIN_BACKGROUND_PRESET_IDS, ErrCode, type Settings, type SettingsUpdateReq } from '../../shared/types'
 import { SETTINGS_KEYS } from '../../shared/settings'
 import { invalidatePublicDataCache, invalidateSiteConfigCache } from '../lib/cache'
 import { getSettings, settingsFromPatchDefaults, touchDataVersion, updateSettings, writeSettingsPatch } from '../lib/db'
 import { fail, ok } from '../lib/response'
+import { badRequest, readJson } from '../lib/routeHelpers'
+import { findSettingsLengthError } from '../lib/settingsLimits'
 import { invalidateRuntimeDataCache } from '../lib/runtimeCache'
 import type { HonoEnv } from '../types'
 
-type AppContext = Context<HonoEnv>
-
 const COMPLETE_PUBLIC_SETTINGS_KEYS: readonly (keyof Settings)[] = SETTINGS_KEYS
-
-function badRequest(c: AppContext, msg: string) {
-  return c.json(fail(ErrCode.BAD_REQUEST, msg))
-}
-
-async function readJson<T>(c: AppContext): Promise<T | null> {
-  try {
-    return await c.req.json<T>()
-  } catch {
-    return null
-  }
-}
 
 function isCompletePublicSettingsPatch(body: SettingsUpdateReq): body is Partial<Settings> {
   return COMPLETE_PUBLIC_SETTINGS_KEYS.every((key) => body[key] !== undefined)
@@ -171,6 +158,12 @@ settingsRoutes.put('/', async (c) => {
   }
   if (body.footer_html !== undefined && typeof body.footer_html !== 'string') {
     return badRequest(c, 'invalid footer_html')
+  }
+
+  // 类型校验全过之后再统一查长度，错误消息里带上字段名和上限。
+  const lengthError = findSettingsLengthError(body as Record<string, unknown>)
+  if (lengthError) {
+    return badRequest(c, `${lengthError.field} exceeds the ${lengthError.max} character limit`)
   }
 
   try {

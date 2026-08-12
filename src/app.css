@@ -1,6 +1,37 @@
 :root {
   font-family: Inter, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
   color: #e5eefb;
+
+  /* 基础设计 token。
+     现状是全项目 48 种 font-size、30 种 border-radius、25 种 transition 写法，
+     而已有的 --admin-* / --confirm-* / --home-* 变量只覆盖了表面颜色。
+     这里补的是排版、圆角、动效和控件内边距，取值全部来自现有代码中出现频次最高的那档，
+     所以引入 token 本身不产生视觉变化。 */
+  --font-size-xs: 11px;
+  --font-size-sm: 12px;
+  --font-size-md: 13px;
+  --font-size-base: 14px;
+  --font-size-lg: 16px;
+
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 18px;
+  --radius-pill: 999px;
+
+  /* 动效只保留两档。61 处声明里 0.18s 出现最多，0.15s 次之；
+     其余 0.16s / 150ms / 180ms / 0.2s 都是同一意图的不同写法。 */
+  --transition-fast: 0.15s ease;
+  --transition-base: 0.18s ease;
+
+  --control-padding-sm: 7px 12px;
+  --control-padding-md: 10px 16px;
+  --control-padding-input: 10px 12px;
+  /* 书签弹窗一屏要放 7 个字段，密度确实需要比登录框紧。
+     保留两档内边距，但圆角和字号仍然全局统一——同一种控件出现 4 种圆角
+     才是需要修的问题，密集表单和登录框的间距差异是合理设计。 */
+  --control-padding-input-sm: 7px 10px;
+
   --home-background:
     radial-gradient(circle at top, rgba(59, 130, 246, 0.22), transparent 40%),
     linear-gradient(180deg, #0f172a 0%, #111827 100%);
@@ -35,6 +66,25 @@ input,
 textarea,
 select {
   font: inherit;
+}
+
+/* iOS Safari 会在聚焦「计算后字号小于 16px」的表单控件时自动放大整个页面。
+   放大只改变可视视口、不改变布局视口，于是按 100dvh 铺开的 position: fixed
+   弹窗会超出屏幕，而且失焦后 iOS 不会自动还原缩放，只能手动双指缩小。
+   桌面浏览器的移动端模拟不会重现这个行为，所以只有真机能测出来。
+
+   把触摸设备上的可聚焦控件抬到 16px 即可从源头避免触发。
+   注意：给 viewport meta 加 maximum-scale=1 / user-scalable=no 不是解法，
+   iOS 10 起会忽略它，而且会剥夺用户正常缩放页面的能力。
+
+   这里必须用 !important：Svelte 会把组件内的 `input { ... }` 编译成
+   `input.s-xxxxx { ... }`（0-1-1），全局的 `input`（0-0-1）优先级更低。 */
+@media (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']),
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
 }
 
 select.native-select {
@@ -320,7 +370,7 @@ select.native-select:disabled {
   background: rgba(255, 255, 255, 0.08);
   color: #e5eefb;
   cursor: pointer;
-  transition: 0.18s ease;
+  transition: var(--transition-base);
 }
 
 .app-toolbar button.active,

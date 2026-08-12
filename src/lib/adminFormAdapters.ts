@@ -6,6 +6,7 @@ import type {
   IconSource,
   PublicBookmark,
 } from '../../shared/types'
+import { normalizeBookmarkUrl } from '../../shared/urlPolicy'
 import type { BookmarkFormValue, CategoryFormValue } from './adminTypes'
 
 export function toCategoryPayload(form: CategoryFormValue): CategoryUpsertReq {
@@ -20,7 +21,9 @@ export function toBookmarkPayload(form: BookmarkFormValue): BookmarkUpsertReq {
   return {
     category_id: Number(form.category_id),
     title: form.title.trim(),
-    url: form.url.trim(),
+    // 直接敲 `example.com` 是常见输入习惯，这里补成 https 再提交，
+    // 免得撞上服务端的协议校验。补不了的原样送出，由服务端给出权威错误。
+    url: normalizeBookmarkUrl(form.url) ?? form.url.trim(),
     icon: form.icon.trim() || null,
     icon_source: (form.icon_source as IconSource) || null,
     icon_background_color: form.icon_background_color.trim() || null,

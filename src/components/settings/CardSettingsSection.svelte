@@ -90,7 +90,7 @@
     padding: 13px 14px;
     background: var(--sp-toggle-bg);
     cursor: pointer;
-    transition: border-color 180ms ease, background 180ms ease;
+    transition: border-color var(--transition-base), background var(--transition-base);
   }
 
   .radio-option:hover {

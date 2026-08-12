@@ -1,5 +1,6 @@
 import type { BackupData, Bookmark, Category, ImportReq, Settings } from '../../shared/types'
 import { normalizeCategories } from '../../shared/categoryHierarchy'
+import { isRecord } from './guards'
 import { iconifyIcon } from './icons'
 
 export type ImportSource = 'cf-navs' | 'sunpanel' | 'browser-html'
@@ -11,12 +12,6 @@ export interface PreparedImport {
   sourceLabel: string
   skipped?: number
   retainedIcons?: number
-}
-
-type UnknownRecord = Record<string, unknown>
-
-function isRecord(value: unknown): value is UnknownRecord {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 }
 
 function readString(value: unknown, fallback = ''): string {

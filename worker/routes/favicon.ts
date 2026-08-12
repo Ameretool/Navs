@@ -1,121 +1,23 @@
 import { Hono } from 'hono'
-import type { Context } from 'hono'
-import { ErrCode, type FaviconResp } from '../../shared/types'
-import { fail, ok } from '../lib/response'
+import type { FaviconResp, SiteMetaResp } from '../../shared/types'
+import {
+  extractIconCandidates,
+  fetchPageHtml,
+  fetchWithTimeout,
+  hostnameFallbackTitle,
+  parseTargetUrl,
+  pickBookmarkTitle,
+} from '../lib/pageMetadata'
+import { cacheResponse, getCachedResponse } from '../lib/iconResponses'
+import { ok } from '../lib/response'
+import { badRequest } from '../lib/routeHelpers'
 import type { HonoEnv } from '../types'
 
-type AppContext = Context<HonoEnv>
-type PageFetchResult = {
-  html: string | null
-  finalUrl: string
-}
-
-const HTML_ACCEPT = 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.1'
 const ICON_ACCEPT = 'image/avif,image/webp,image/apng,image/*,*/*;q=0.1'
-const MAX_HTML_LENGTH = 256_000
-const FETCH_TIMEOUT_MS = 3000
 const OVERALL_DEADLINE_MS = 6000
-
-function badRequest(c: AppContext, msg: string) {
-  return c.json(fail(ErrCode.BAD_REQUEST, msg))
-}
-
-// 带超时的 fetch：避免某个上游连接挂起导致整个请求长时间卡住。
-async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = FETCH_TIMEOUT_MS): Promise<Response> {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), timeoutMs)
-  try {
-    return await fetch(url, { ...init, signal: controller.signal })
-  } finally {
-    clearTimeout(timer)
-  }
-}
-
-function parseTargetUrl(raw: string | null): URL | null {
-  if (!raw) return null
-
-  const value = raw.trim()
-  if (!value) return null
-
-  try {
-    const url = new URL(value)
-    if (!['http:', 'https:'].includes(url.protocol) || !url.hostname) {
-      return null
-    }
-    return url
-  } catch {
-    return null
-  }
-}
-
-function extractAttribute(tag: string, name: string): string | null {
-  const pattern = new RegExp(name + '\\s*=\\s*(?:"([^"]*)"|\'([^\']*)\'|([^\\s"\'=<>`]+))', 'i')
-  const match = tag.match(pattern)
-  const value = match?.[1] ?? match?.[2] ?? match?.[3]
-  return value?.trim() || null
-}
-
-function resolveHttpUrl(raw: string, baseUrl: string): string | null {
-  try {
-    const url = new URL(raw, baseUrl)
-    if (!['http:', 'https:'].includes(url.protocol)) {
-      return null
-    }
-    return url.toString()
-  } catch {
-    return null
-  }
-}
-
-function extractIconCandidates(html: string, baseUrl: string): string[] {
-  const matches = html.match(/<link\b[^>]*>/gi) ?? []
-  const seen = new Set<string>()
-  const candidates: string[] = []
-
-  for (const tag of matches) {
-    const rel = extractAttribute(tag, 'rel')
-    const href = extractAttribute(tag, 'href')
-    if (!rel || !href || !/\bicon\b/i.test(rel)) {
-      continue
-    }
-
-    const resolved = resolveHttpUrl(href, baseUrl)
-    if (!resolved || seen.has(resolved)) {
-      continue
-    }
-
-    seen.add(resolved)
-    candidates.push(resolved)
-  }
-
-  return candidates
-}
-
-async function fetchPageHtml(url: string): Promise<PageFetchResult | null> {
-  try {
-    const response = await fetchWithTimeout(url, {
-      redirect: 'follow',
-      headers: {
-        Accept: HTML_ACCEPT,
-      },
-    })
-
-    const finalUrl = response.url || url
-    if (!response.ok) {
-      return { html: null, finalUrl }
-    }
-
-    const contentType = response.headers.get('content-type')?.toLowerCase() ?? ''
-    if (!contentType.includes('text/html') && !contentType.includes('application/xhtml+xml')) {
-      return { html: null, finalUrl }
-    }
-
-    const html = await response.text()
-    return { html: html.slice(0, MAX_HTML_LENGTH), finalUrl }
-  } catch {
-    return null
-  }
-}
+// 站点名称只需要一次页面抓取，不用像图标那样逐个探测候选，deadline 相应更短。
+const SITE_META_DEADLINE_MS = 4000
+const SITE_META_CACHE_SECONDS = 6 * 60 * 60
 
 async function canFetchIcon(url: string): Promise<boolean> {
   try {
@@ -207,6 +109,73 @@ faviconRoutes.get('/fetch-favicon', async (c) => {
     // 任何异常也回退到 favicon.im 兜底，保证总能给出一个可用图标
     return c.json(ok<FaviconResp>({ icon: buildFaviconImFallback(targetUrl.hostname) }))
   }
+})
+
+// 新增书签时解析站点名称。这是便利功能，任何失败都回退到域名，不向前端报错。
+faviconRoutes.get('/fetch-site-meta', async (c) => {
+  const targetUrl = parseTargetUrl(new URL(c.req.url).searchParams.get('url'))
+  if (!targetUrl) {
+    return badRequest(c, 'invalid url')
+  }
+
+  const requestedUrl = targetUrl.toString()
+  // 用合成的 key 命中 edge cache：不带 Authorization，且按目标地址区分。
+  const cacheKey = new Request(
+    `https://cf-navs.internal/site-meta?url=${encodeURIComponent(requestedUrl)}`,
+    { method: 'GET' },
+  )
+
+  const cached = await getCachedResponse(cacheKey)
+  if (cached) {
+    return new Response(cached.body, {
+      status: cached.status,
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+    })
+  }
+
+  const fallback: SiteMetaResp = {
+    title: hostnameFallbackTitle(requestedUrl),
+    final_url: requestedUrl,
+  }
+
+  async function resolveSiteMeta(): Promise<SiteMetaResp> {
+    const page = await fetchPageHtml(requestedUrl)
+    if (!page) {
+      return fallback
+    }
+
+    return {
+      title: pickBookmarkTitle({ html: page.html, finalUrl: page.finalUrl, requestedUrl }),
+      final_url: page.finalUrl || requestedUrl,
+    }
+  }
+
+  let meta = fallback
+  try {
+    const deadline = new Promise<SiteMetaResp>((resolve) =>
+      setTimeout(() => resolve(fallback), SITE_META_DEADLINE_MS),
+    )
+    meta = await Promise.race([resolveSiteMeta(), deadline])
+  } catch {
+    meta = fallback
+  }
+
+  // 只缓存真正解析出内容的结果：域名兜底通常意味着这次抓取失败或被拦，
+  // 缓存它会让用户重试时一直拿到同一个坏结果。
+  if (meta.title && meta.title !== fallback.title) {
+    cacheResponse(
+      c,
+      cacheKey,
+      new Response(JSON.stringify(ok<SiteMetaResp>(meta)), {
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': `public, max-age=${SITE_META_CACHE_SECONDS}`,
+        },
+      }),
+    )
+  }
+
+  return c.json(ok<SiteMetaResp>(meta))
 })
 
 export default faviconRoutes

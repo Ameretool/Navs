@@ -100,7 +100,7 @@
   .modal-card {
     position: relative;
     width: min(100%, 420px);
-    border-radius: 18px;
+    border-radius: var(--radius-xl);
     background: #ffffff;
     box-shadow: 0 24px 60px rgba(15, 23, 42, 0.24);
     padding: 20px;
@@ -142,9 +142,9 @@
     width: 100%;
     box-sizing: border-box;
     border: 1px solid #cbd5e1;
-    border-radius: 12px;
-    padding: 10px 12px;
-    font-size: 14px;
+    border-radius: var(--radius-lg);
+    padding: var(--control-padding-input);
+    font-size: var(--font-size-base);
     color: #0f172a;
     background: #ffffff;
   }
@@ -170,11 +170,11 @@
 
   .primary-button,
   .ghost-button {
-    border-radius: 12px;
-    padding: 10px 16px;
-    font-size: 14px;
+    border-radius: var(--radius-lg);
+    padding: var(--control-padding-md);
+    font-size: var(--font-size-base);
     cursor: pointer;
-    transition: 0.18s ease;
+    transition: var(--transition-base);
   }
 
   .primary-button {

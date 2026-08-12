@@ -11,6 +11,8 @@
   export let descriptionMode: BookmarkFormValue['description_mode'] = 'inherit'
   export let categories: CategoryTreeOption[] = []
   export let loading = false
+  export let titleLoading = false
+  export let onUrlBlur: (() => void) | undefined = undefined
 </script>
 
 <div class="field-compact field-label">
@@ -26,13 +28,22 @@
 </div>
 
 <label class="field-compact">
-  <span>书签标题</span>
+  <span>
+    书签标题
+    {#if titleLoading}<small class="field-hint">解析中…</small>{/if}
+  </span>
   <input bind:value={title} type="text" placeholder="例如：Svelte 官方网站" required />
 </label>
 
 <label class="field-compact">
   <span>链接地址</span>
-  <input bind:value={url} type="url" placeholder="https://example.com" required />
+  <input
+    bind:value={url}
+    type="url"
+    placeholder="https://example.com"
+    required
+    on:blur={() => onUrlBlur?.()}
+  />
 </label>
 
 <label class="field-compact">
@@ -80,15 +91,22 @@
     grid-column: span 1;
   }
 
+  .field-hint {
+    margin-left: 6px;
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 400;
+  }
+
   input,
   select,
   textarea {
     width: 100%;
     box-sizing: border-box;
     border: 1px solid #cbd5e1;
-    border-radius: 9px;
-    padding: 6px 9px;
-    font-size: 13px;
+    border-radius: var(--radius-lg);
+    padding: var(--control-padding-input-sm);
+    font-size: var(--font-size-base);
     color: #0f172a;
     background: #ffffff;
     font-family: inherit;

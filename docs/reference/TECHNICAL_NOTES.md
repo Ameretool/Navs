@@ -192,7 +192,11 @@ Worker 对 HTML 响应设置基础安全头：
 - `Referrer-Policy: strict-origin-when-cross-origin`
 - `Permissions-Policy` 关闭摄像头、麦克风和地理位置权限。
 
-后台的自定义页脚通过 `footer_html` 渲染到首页底部。该字段用于可信管理员自定义少量展示 HTML；CSP 会保留必要的内联样式能力，但不会允许 `<script>` 或 `onerror` / `onclick` 等内联事件处理器执行。不要把不可信用户提交的内容写入 `footer_html`。
+后台的自定义页脚通过 `footer_html` 渲染到首页底部。该字段用于可信管理员自定义少量展示 HTML；CSP 会保留必要的内联样式能力（`style-src` 含 `'unsafe-inline'`），但**不允许** `<script>` 或 `onerror` / `onclick` 等内联事件处理器执行——`script-src` 是 `'self' blob:`，没有 `'unsafe-inline'`。不要把不可信用户提交的内容写入 `footer_html`。
+
+后台的「自定义 JS」（`custom_js`）通过 **blob URL** 注入，而不是内联 `<script>`：`URL.createObjectURL(new Blob([js]))` 之后赋给 `script.src`，因此 `script-src 'self' blob:` 就够用，不需要 `'unsafe-inline'`。这样做的意义是 `footer_html` 里的内联事件处理器和 `javascript:` 链接仍然被 CSP 拦住——要拿到 blob URL 必须先能执行脚本，只能注入 HTML 的攻击者用不上它。实现见 `src/lib/customScript.ts`，其中还用 `lastSource` 做幂等，避免切换主题时把用户脚本重复执行。
+
+`custom_js` 和 `footer_html` 都在 `SETTINGS_KEYS` 里，所以 `POST /api/import` 的覆盖模式可以写入它们。前端在覆盖导入的确认弹窗中会检测并明示备份携带的这两项内容及其大小，由管理员决定是否继续；服务端不拦截，因为管理员给自己的站点加脚本是合法需求。
 
 ## 前端性能策略
 

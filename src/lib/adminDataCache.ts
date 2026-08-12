@@ -1,14 +1,11 @@
 import type { AdminData } from '../../shared/types'
 import { normalizeCategories } from '../../shared/categoryHierarchy'
 import { getStoredAuthSession } from './api'
+import { isRecord } from './guards'
 import { clearSnapshots, currentSnapshotOrigin, hashSnapshotScope, pruneOtherSnapshots, readSnapshot, type SnapshotStorageConfig, writeSnapshot } from './snapshotStorage'
 
 type CachedAdminDataPayload = { saved_at: number; version?: string | null; data: AdminData }
 export interface CachedAdminDataEntry { version: string | null; data: AdminData }
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
-}
 
 function parsePayload(value: unknown): CachedAdminDataEntry | null {
   if (!isRecord(value) || !isRecord(value.data)) return null
@@ -33,8 +30,6 @@ function sessionCacheKey(): string | null {
   if (!session) return null
   return `${hashSnapshotScope(currentSnapshotOrigin())}-${hashSnapshotScope(`${session.username}:${session.token}:${session.expires_at}`)}`
 }
-
-export async function readCachedAdminData(): Promise<AdminData | null> { return (await readCachedAdminDataEntry())?.data ?? null }
 
 export async function readCachedAdminDataEntry(): Promise<CachedAdminDataEntry | null> {
   const key = sessionCacheKey()

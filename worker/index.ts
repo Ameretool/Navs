@@ -38,6 +38,8 @@ app.use('/api/bookmarks/*', authRequired)
 app.route('/api/bookmarks', bookmarksRoutes)
 
 app.use('/api/fetch-favicon', authRequired)
+// 精确路径中间件，没有通配符：新增同文件路由时必须补一行，否则接口是公开的。
+app.use('/api/fetch-site-meta', authRequired)
 app.route('/api', faviconRoutes)
 
 // /api/icon/:id 公开（不须认证），用于前台加载缓存图标

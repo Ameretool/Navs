@@ -1,4 +1,4 @@
-import type { InstallBinding, InstallStatusResp } from '../../shared/types'
+import { ErrCode, type InstallBinding, type InstallStatusResp } from '../../shared/types'
 
 export type InstallRoute = 'install' | 'app'
 
@@ -29,6 +29,41 @@ export interface InstallViewState {
 
 export function isInstallPath(pathname: string): boolean {
   return pathname === '/install' || pathname.startsWith('/install/')
+}
+
+// 启动时是否需要探测 `/api/install/status`。
+//
+// 这个探测过去无条件发出，而且串行阻塞在所有数据加载之前——每次打开页面都白白
+// 多一个完整的网络往返加两次 D1 查询（可达性探测 + 三个 key 的读取）。浏览器已经
+// 记住装过之后就没有再问的必要。
+//
+// 保留三种仍然必须探测的情况：
+// - 本地没有安装标记（全新浏览器、清过站点数据、或者确实还没装）；
+// - 用户主动访问 `/install`，这时必须拿到真实状态而不是本地猜测；
+// - 数据加载因服务端错误失败后的复核（由调用方传 `forceProbe`），
+//   用来覆盖「数据库被重置 / 重新绑定」这种本地标记已经过期的情况。
+export function shouldProbeInstallStatus(input: {
+  installedHint: boolean
+  pathname: string
+  forceProbe?: boolean
+}): boolean {
+  return Boolean(input.forceProbe) || !input.installedHint || isInstallPath(input.pathname)
+}
+
+// 数据加载失败后要不要回头复核安装状态。
+//
+// 只认服务端错误：未登录、公开模式关闭都是正常的业务分支，网络错误说明根本没连上
+// 服务端，这些情况下再发一个探测请求没有意义，只会在弱网时雪上加霜。
+export function shouldRecheckInstallAfterDataError(error: unknown): boolean {
+  const code = (error as { code?: unknown } | null)?.code
+  const status = (error as { status?: unknown } | null)?.status
+
+  // `status: 0` 是 api.ts 对「请求根本没到服务端」的约定，它同时带 SERVER_ERROR。
+  // 弱网时再补一个探测请求只会雪上加霜，而且拿不到任何新信息。必须排在前面判断。
+  if (status === 0) return false
+  if (code === ErrCode.UNAUTHORIZED || code === ErrCode.FORBIDDEN) return false
+  if (typeof status === 'number' && status >= 500) return true
+  return code === ErrCode.SERVER_ERROR
 }
 
 export function getInstallRoute(status: InstallStatusResp): InstallRoute {
