@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import {
   collectPrecacheAssetUrls,
   createPrecacheMessage,
+  listenForShellUpdate,
   registerServiceWorker,
 } from '../../src/lib/serviceWorkerClient'
 
@@ -98,18 +99,17 @@ describe('service worker registration', () => {
     await expect(registerServiceWorker(container, () => ['/assets/a.js'])).resolves.toBeUndefined()
   })
 
-  it('forwards the shell-update notice to the caller', async () => {
+  it('forwards the shell-update notice to the caller', () => {
+    // 监听独立注册，供页面在模块求值阶段同步挂上，赢下 shell-updated 早于 load 的竞态。
     const onShellUpdated = vi.fn()
     let listener: ((event: { data?: unknown }) => void) | null = null
     const container = {
-      register: vi.fn(async () => ({ active: null })),
-      controller: null,
       addEventListener: (_type: 'message', handler: (event: { data?: unknown }) => void) => {
         listener = handler
       },
     }
 
-    await registerServiceWorker(container, () => [], onShellUpdated)
+    listenForShellUpdate(container, onShellUpdated)
     listener?.({ data: { type: 'shell-updated' } })
     listener?.({ data: { type: 'something-else' } })
 

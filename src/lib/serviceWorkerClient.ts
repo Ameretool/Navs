@@ -50,17 +50,24 @@ type ServiceWorkerContainerLike = {
   addEventListener?: (type: 'message', listener: (event: { data?: unknown }) => void) => void
 }
 
+// 单独暴露、供页面在模块加载时同步调用。
+//
+// SW 的 shell-updated 消息在导航后台重校验完成时发出，可能早于 window load。
+// 把监听绑定拖到 registerServiceWorker（跑在 load 里）就会漏掉这条消息，提示不弹。
+// 分离后监听在脚本求值阶段就挂上，赢下大部分竞态窗口。
+export function listenForShellUpdate(
+  container: Pick<ServiceWorkerContainerLike, 'addEventListener'>,
+  onShellUpdated: () => void,
+): void {
+  container.addEventListener?.('message', (event) => {
+    if ((event.data as { type?: unknown } | undefined)?.type === 'shell-updated') onShellUpdated()
+  })
+}
+
 export async function registerServiceWorker(
   container: ServiceWorkerContainerLike,
   getAssetUrls: () => string[],
-  onShellUpdated?: () => void,
 ): Promise<void> {
-  if (onShellUpdated) {
-    container.addEventListener?.('message', (event) => {
-      if ((event.data as { type?: unknown } | undefined)?.type === 'shell-updated') onShellUpdated()
-    })
-  }
-
   let registration: Awaited<ReturnType<ServiceWorkerContainerLike['register']>>
   try {
     registration = await container.register('/sw.js')
