@@ -41,7 +41,7 @@ describe('JWT stateless authentication utilities', () => {
   it('signs and verifies JWT tokens correctly', async () => {
     const secret = 'super-secret-key-1234567890-test'
     const payload = { username: 'admin', exp: Date.now() + 10000 }
-    
+
     const token = await signJwt(payload, secret)
     expect(token).toMatch(/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/)
 
@@ -55,7 +55,7 @@ describe('JWT stateless authentication utilities', () => {
     const payload = { username: 'admin', exp: Date.now() + 10000 }
 
     const token = await signJwt(payload, secret)
-    
+
     // Test verification with incorrect secret
     const verifiedWrongSecret = await verifyJwt(token, wrongSecret)
     expect(verifiedWrongSecret).toBeNull()
