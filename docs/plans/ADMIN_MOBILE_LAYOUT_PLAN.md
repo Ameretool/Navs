@@ -1,5 +1,8 @@
 # 后台管理移动端布局优化开发计划
 
+> **状态：已完成**（实现见 `23566ed` improve admin mobile layout、`c347d2d` reduce mobile admin header and reserve footer space）。
+> 本文件作为决策与验收记录保留；第 6.1 节记录的是**实施前**的现状勘察，不是遗留待办。
+
 ## 1. 目标与范围
 
 本次只调整后台管理页面的响应式布局和展示密度，不改变 API、数据结构、权限逻辑、导入导出语义或桌面端已有业务流程。

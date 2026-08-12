@@ -80,8 +80,12 @@ src/
 │   ├── admin/          # 后台列表面板与样式
 │   ├── ...
 ├── lib/
-│   ├── api.ts          # API 客户端
-│   ├── stores.ts       # Svelte stores
+│   ├── api.ts          # API 客户端（只保留前端实际调用的接口）
+│   ├── stores.ts       # Svelte stores（纯状态容器；取数在 dataService.ts）
+│   ├── dataService.ts  # 公开/后台聚合数据获取、版本确认与本地快照编排
+│   ├── customScript.ts # 自定义 JS 的 blob 注入与生命周期
+│   ├── serviceWorkerClient.ts # SW 注册、构建产物预热清单、新版本提示
+│   ├── guards.ts       # 跨模块共用的类型守卫
 │   ├── icons.ts        # 图标候选辅助（多源候选 + 文字图标配色）
 │   ├── adminDataCache.ts # 登录态后台聚合数据浏览器本地快照
 │   ├── localBookmarkIconCache.ts # 书签图标浏览器本地缓存
@@ -114,6 +118,10 @@ worker/
 │   └── auth.ts         # 认证中间件
 ├── lib/
 │   ├── db.ts           # 数据库操作（含幂等迁移）
+│   ├── routeHelpers.ts # 路由层共用校验与响应 helper（含批量/排序上限）
+│   ├── bookmarkPayload.ts # 书签写入 payload 的统一校验与归一化
+│   ├── sessionRevocation.ts # 退出登录的会话撤销名单
+│   ├── settingsLimits.ts # 设置项长度上限
 │   ├── settingsData.ts # settings 默认值、旧数据兼容和归一化
 │   ├── iconResponses.ts # 图标响应、fallback 与 edge cache 写入
 │   ├── iconifySearch.ts # Iconify 搜索、候选排序和代理缓存预热
@@ -122,6 +130,8 @@ worker/
 │   └── ...
 └── index.ts            # Worker 入口
 ```
+
+`shared/` 中除类型与设置定义外，还有 `categoryHierarchy.ts`（分类层级校验）和 `urlPolicy.ts`（书签地址协议白名单，前后端共用）。
 
 ### 数据模型
 ```sql
@@ -237,10 +247,13 @@ SESSION_TTL = "604800"             # 会话有效期（7天）
 ### 前端
 - Vite 快速构建
 - 首页主包、后台管理和书签编辑弹窗代码分割，后台功能按需加载
+- 浏览器本地存在「已安装」标记时，启动不再探测 `/api/install/status`。该探测过去无条件串行阻塞在所有数据加载之前，每次打开页面都多一个完整网络往返和两次 D1 查询。访问 `/install` 或没有本地标记时仍然探测；数据加载因服务端错误失败时会回头复核一次，覆盖数据库被重置导致本地标记过期的情况
 - 匿名首页启动优先使用本地公开快照加 `/api/data/version` 做远端确认；本地无快照或版本变化时才请求 `/api/public/data` 派生站点配置。公开关闭时复用 1005 响应中的轻量配置进入登录页，匿名 1005 会短时走 edge cache
 - 登录弹窗、后台管理和书签编辑弹窗独立分包；未登录访问管理入口或私有站点登录页时只下载轻量登录弹窗，登录成功后回到前台首页，进入后台时才下载后台管理分包
 - 加载提示使用轻量 CSS 动画和进度条，不依赖重型脚本或图片资源
 - Worker 为非 HTML 的 `/assets/*` hash 构建产物设置一年 immutable 缓存，为 HTML 和 `sw.js` 设置 no-cache 重验证；Service Worker 预缓存 `/index.html` 做离线回退，避免安装阶段重复预缓存根路径，并且运行时只缓存成功静态资源和成功 HTML 导航响应，避免失败响应污染本地缓存
+- Service Worker 导航请求使用 stale-while-revalidate：先返回缓存的 `/index.html` 再后台更新，二访首屏不等网络；检测到 HTML 内容变化时通知页面弹出「已检测到新版本」提示，把版本滞后窗口从「下次打开」缩短到「现在刷新」
+- 页面在 `load` 后把本次实际加载的 `/assets/*` 清单 `postMessage` 给 Service Worker 预热。`/assets/*` 文件名带 hash 无法写进静态 `APP_SHELL`，而首次访问时 SW 尚未接管、拦不到当次的 JS/CSS 请求，不主动送清单的话第一次访问结束时 Cache Storage 里一个构建产物都没有
 - CSS 压缩
 - 首页普通书签图标优先读取聚合数据 `icon_blob`，没有内嵌图标时才读取浏览器本地图标缓存；仍缺失时回退已保存的普通 HTTP(S) 图标 URL，不主动挂载 `/api/icon/:id`；编辑弹窗先打开，再后台调用短超时刷新接口更新本地图标缓存，保存书签后也会显式刷新；首页图标接近视口后才设置 `src`，并继续使用原生懒加载与异步解码，降低首屏图标解码和请求压力
 - 前台右上角主题按钮使用浏览器本地偏好快速切换亮暗模式，不触发 Worker 请求；新增/编辑书签弹窗默认收起文字图标配色和 Iconify 输入区，选中对应图标类型后才展开
@@ -249,7 +262,7 @@ SESSION_TTL = "604800"             # 会话有效期（7天）
 - 顶部导航使用 `ResizeObserver` 合并更新溢出状态，箭头按约 70% 可视宽度滚动；左侧常显的手动收缩偏好仅保存在浏览器版本化 `localStorage` 键中
 - 登录态启动会先读取后台聚合本地快照，再用 `/api/data/version` 做远端确认；版本相同时不拉完整数据，版本变化、无快照、后台入口需要完整数据或首页管理操作需要回滚时，才使用 `/api/admin/data` 一次拉取分类、书签和完整设置，并从完整设置派生站点配置。后台直达路径恢复快照时不会提前解除启动遮罩
 - 登录响应携带用户名；登录成功和已有登录态启动都无需先请求 `/api/me`
-- Worker 认证中间件在单个 isolate 内短时复用已验证 session，后台连续操作不必每个请求都读取 KV，登录成功和退出登录会同步更新该内存缓存
+- Worker 认证中间件在单个 isolate 内短时（15 秒）复用已验证的 JWT 校验结果，后台连续操作不必每个请求都重复验签和读取 KV 撤销名单；登录成功和退出登录会同步更新该内存缓存
 - 前端 API 客户端在内存中复用已解析的有效登录态，认证请求不再反复读取和解析 localStorage，并监听跨标签页 storage 变更
 - 登录 bootstrap 与密码校验使用一次 settings 查询同时读取管理员账号和密码
 - 登录失败记录复用限流中间件已读取的 KV 状态，避免失败路径重复读取同一个限流 key
@@ -266,7 +279,7 @@ SESSION_TTL = "604800"             # 会话有效期（7天）
 - KV 会话缓存
 - Worker 边缘计算
 - `/api/config` 使用短 TTL Cloudflare edge cache，设置保存和导入后主动失效
-- `/api/data/version` 使用内部 `settings.data_version` 做轻量变更确认；分类、书签、排序、设置、导入和实际变化的显式图标缓存刷新都会更新版本
+- `/api/data/version` 使用一次 `settings` 查询同时读取 `site_title`、`public_mode` 和内部 `data_version` 做轻量变更确认；分类、书签、排序、设置、导入和实际变化的显式图标缓存刷新都会更新版本
 - 匿名 `/api/public/data` 未携带 no-cache 指令时使用 Cloudflare edge cache，命中时不读取 D1；cache miss 时优先复用 `/api/config` edge cache，没有命中才轻量读取 `site_title/public_mode` 并预热配置缓存，私有模式下的匿名 1005 响应也短时缓存到 edge，写入接口负责失效缓存
 - `/api/admin/data` 合并后台进入时的数据读取，分类、书签和 settings 使用 D1 batch 读取，并随响应携带当前数据版本；请求带 no-cache 指令时会绕过 Worker isolate 内的短 TTL 运行时聚合缓存
 - `/api/public/data` 确认公开后用一次 D1 batch 合并公开 settings、分类和书签读取，并只读取首页公开字段；书签公开字段保留 `icon_blob` 以支持本地优先图标展示，但不返回 `created_at` 等管理字段；同请求内刚从 D1 读取过的 `site_title/public_mode` 会合并进公开 settings，避免第二次 settings 查询重复读取这两行
@@ -285,7 +298,12 @@ SESSION_TTL = "604800"             # 会话有效期（7天）
 ## 🔒 安全特性
 
 - 密码使用 WebCrypto PBKDF2 哈希存储
-- Session token 随机生成
+- 会话为 HS256 无状态 JWT，密钥保存在 `settings.jwt_secret`，payload 含 `jti` 保证每个会话 token 唯一
+- 退出登录把 token 摘要写入 KV 撤销名单并按剩余寿命设置 TTL，token 立即失效；修改密码轮换签名密钥，一次性作废全部会话
+- 书签地址在写入边界统一限制为 `http(s)`（`shared/urlPolicy.ts`，前后端共用），导入时缺协议的写法补成 https 保留，其余不合规条目跳过并计入 `skipped_bookmarks`
+- 后台「自定义 JS」通过 blob URL 加载而不是内联 `<script>`，因此 CSP 只需 `script-src 'self' blob:`，不含 `'unsafe-inline'`：`footer_html` 里的内联事件处理器和 `javascript:` 链接仍然被阻断
+- 覆盖导入的确认弹窗会明示备份携带的 `custom_js` / `footer_html` 及其大小，避免第三方备份静默注入可执行内容
+- 设置项、批量删除、排序和导入数组均有长度上限，超限返回明确错误而不是 500
 - Bearer Session Token 通过 `Authorization` 请求头发送，不使用 Cookie，因此没有基于 Cookie 的 CSRF 攻击面
 - Session Token 保存在浏览器 `localStorage`；严格 CSP、同源脚本限制和输出转义共同降低 XSS 窃取风险
 - 管理员操作鉴权
@@ -294,8 +312,9 @@ SESSION_TTL = "604800"             # 会话有效期（7天）
 ## 📝 开发规范
 
 ### 代码风格
-- TypeScript 严格模式
+- TypeScript 严格模式，并开启 `noUnusedLocals` / `noUnusedParameters`；刻意保留的形参用 `_` 前缀标注意图
 - `tsc` 与 `svelte-check` 作为类型和组件诊断基线
+- 排版、圆角、动效和控件内边距使用 `src/app.css` `:root` 中的设计 token；组件内不直接写死 `font-size` / `border-radius` / `transition` 时长，由契约测试保证
 - 组件单一职责
 - 类型安全
 

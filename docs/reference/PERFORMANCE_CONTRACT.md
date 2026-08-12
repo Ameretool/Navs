@@ -2,6 +2,11 @@
 
 This document records the current performance-sensitive behavior that should not be changed casually.
 
+## Startup Requests
+
+- A second visit must not issue `GET /api/install/status`. The browser's local installed hint is authoritative; the probe only runs without that hint, on `/install`, or as a one-off recheck after a server-side data load failure.
+- `GET /api/data/version` must stay at one D1 query. It runs on every page load, so an extra query is an extra serialized round trip.
+
 ## Data Freshness
 
 - A valid local snapshot should unlock the home view immediately on refresh; remote freshness validation continues in the background through the existing data-version flow.
@@ -25,6 +30,8 @@ This document records the current performance-sensitive behavior that should not
 
 ## Service Worker And Storage
 
+- Navigation requests use stale-while-revalidate: the cached `/index.html` is served immediately and refreshed in the background. Do not revert to network-first without measuring the second-visit first paint.
+- The page sends the current document's `/assets/*` list to the Service Worker after `load` so hashed build output actually lands in Cache Storage on the first visit. Do not remove this without replacing it with a build-time manifest.
 - The Service Worker must not write `/api/icon/*` or `/api/iconify/*` bookmark icon proxy responses into Cache Storage.
 - Category icons may stay cached because their count is small.
 - Cross-origin `opaque` Iconify responses must not be cached.
