@@ -267,7 +267,7 @@
   .configuration-panel .schema-note { color: #7dd3fc; font-size: 0.8rem; }
   .field { display: grid; gap: 8px; }
   label { color: #dbeafe; font-size: 0.86rem; font-weight: 700; }
-  input { width: 100%; min-height: 48px; padding: 0 14px; color: #f8fafc; border: 1px solid #334155; border-radius: 10px; outline: none; background: rgba(2, 8, 23, 0.44); transition: border-color 150ms ease, box-shadow 150ms ease; }
+  input { width: 100%; min-height: 48px; padding: 0 14px; color: #f8fafc; border: 1px solid #334155; border-radius: 10px; outline: none; background: rgba(2, 8, 23, 0.44); transition: border-color var(--transition-fast), box-shadow var(--transition-fast); }
   input:focus { border-color: #2dd4bf; box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.14); }
   input:disabled { opacity: 0.62; cursor: wait; }
   .field p { margin: 0; color: #77869b; font-size: 0.74rem; line-height: 1.55; }
@@ -276,7 +276,7 @@
   .install-error { display: grid; gap: 5px; padding: 13px 15px; color: #fecaca; border: 1px solid rgba(248, 113, 113, 0.3); border-radius: 10px; background: rgba(127, 29, 29, 0.16); font-size: 0.8rem; line-height: 1.5; }
   .install-error button { justify-self: start; padding: 4px 0; color: #fda4af; border: 0; background: transparent; text-decoration: underline; cursor: pointer; }
 
-  .install-submit { min-height: 50px; padding: 0 20px; color: #042f2e; border: 0; border-radius: 10px; background: linear-gradient(100deg, #5eead4, #7dd3fc); box-shadow: 0 14px 30px rgba(45, 212, 191, 0.16); font-weight: 850; cursor: pointer; transition: transform 150ms ease, box-shadow 150ms ease; }
+  .install-submit { min-height: 50px; padding: 0 20px; color: #042f2e; border: 0; border-radius: 10px; background: linear-gradient(100deg, #5eead4, #7dd3fc); box-shadow: 0 14px 30px rgba(45, 212, 191, 0.16); font-weight: 850; cursor: pointer; transition: transform var(--transition-fast), box-shadow var(--transition-fast); }
   .install-submit:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 18px 36px rgba(45, 212, 191, 0.23); }
   .install-submit:focus-visible { outline: 3px solid rgba(125, 211, 252, 0.42); outline-offset: 3px; }
   .install-submit:disabled { opacity: 0.66; cursor: wait; }

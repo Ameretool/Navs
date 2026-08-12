@@ -401,7 +401,7 @@
     background: transparent;
     color: var(--sp-muted);
     cursor: pointer;
-    transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease, transform 0.18s ease;
+    transition: background var(--transition-base), border-color var(--transition-base), color var(--transition-base), transform var(--transition-base);
   }
 
   .settings-submenu button:hover { background: var(--sp-toggle-bg); color: var(--sp-strong); transform: translateX(2px); }
@@ -458,12 +458,12 @@
     cursor: pointer;
     box-shadow: 0 6px 14px rgba(37, 99, 235, 0.14);
     transition:
-      transform 0.15s ease,
-      box-shadow 0.15s ease,
-      opacity 0.15s ease,
-      background 0.15s ease,
-      border-color 0.15s ease,
-      color 0.15s ease;
+      transform var(--transition-fast),
+      box-shadow var(--transition-fast),
+      opacity var(--transition-fast),
+      background var(--transition-fast),
+      border-color var(--transition-fast),
+      color var(--transition-fast);
     white-space: nowrap;
   }
 

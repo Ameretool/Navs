@@ -222,7 +222,7 @@
     white-space: nowrap;
     cursor: pointer;
     opacity: 0.74;
-    transition: background 0.16s ease, border-color 0.16s ease, opacity 0.16s ease;
+    transition: background var(--transition-fast), border-color var(--transition-fast), opacity var(--transition-fast);
   }
 
   .scope-tabs button:hover {

@@ -92,8 +92,8 @@
       inset 0 -1px 0 rgba(255, 255, 255, 0.1),
       0 4px 14px rgba(15, 23, 42, 0.08);
     transition:
-      transform 0.16s ease,
-      border-color 0.16s ease;
+      transform var(--transition-fast),
+      border-color var(--transition-fast);
   }
 
   .bookmark-card:focus-visible {

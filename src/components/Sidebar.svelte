@@ -918,7 +918,7 @@
     border-left: 0;
     border-radius: 0 16px 16px 0;
     background: transparent;
-    transition: width 0.24s ease, background 0.24s ease, border-color 0.24s ease, box-shadow 0.24s ease;
+    transition: width var(--transition-base), background var(--transition-base), border-color var(--transition-base), box-shadow var(--transition-base);
   }
 
   .toc-sidebar.expanded {
@@ -1095,7 +1095,7 @@
     background: var(--toc-slip);
     transform: scaleX(0.5);
     transform-origin: left center;
-    transition: transform 0.2s ease, background 0.18s ease;
+    transition: transform var(--transition-base), background var(--transition-base);
   }
 
   .toc-item:hover .toc-slip,
@@ -1121,7 +1121,7 @@
     height: 26px;
     min-width: 26px;
     border-radius: 7px;
-    transition: border-color 0.18s ease, transform 0.18s ease;
+    transition: border-color var(--transition-base), transform var(--transition-base);
   }
 
   .toc-item:hover .toc-icon-slot :global(.toc-category-icon),
@@ -1140,7 +1140,7 @@
     white-space: nowrap;
     text-overflow: ellipsis;
     font-size: 14px;
-    transition: opacity 0.2s ease;
+    transition: opacity var(--transition-base);
   }
 
   .toc-sidebar.expanded .toc-title {

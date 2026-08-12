@@ -104,9 +104,9 @@
     width: 100%;
     box-sizing: border-box;
     border: 1px solid #cbd5e1;
-    border-radius: 9px;
-    padding: 6px 9px;
-    font-size: 13px;
+    border-radius: var(--radius-lg);
+    padding: var(--control-padding-input-sm);
+    font-size: var(--font-size-base);
     color: #0f172a;
     background: #ffffff;
     font-family: inherit;

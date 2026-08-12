@@ -281,7 +281,7 @@
     height: 100%;
     border-radius: 3px;
     background: var(--admin-accent);
-    transition: width 0.3s ease;
+    transition: width var(--transition-base);
   }
 
   .top-item-clicks {

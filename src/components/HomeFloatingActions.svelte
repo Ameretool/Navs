@@ -165,7 +165,7 @@
     font-size: 1.15rem;
     line-height: 1;
     cursor: pointer;
-    transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+    transition: background var(--transition-base), border-color var(--transition-base), transform var(--transition-base);
     display: flex;
     align-items: center;
     justify-content: center;

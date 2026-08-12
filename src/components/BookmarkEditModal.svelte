@@ -460,7 +460,7 @@
     min-height: 0;
     overflow: hidden;
     overscroll-behavior: contain;
-    border-radius: 18px;
+    border-radius: var(--radius-xl);
     background: #ffffff;
     box-shadow: 0 24px 60px rgba(15, 23, 42, 0.24);
     padding: 0;

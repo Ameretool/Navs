@@ -278,7 +278,7 @@
     font: inherit;
     text-align: left;
     cursor: pointer;
-    transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
   }
 
   .compact .category-select-trigger {
@@ -328,7 +328,7 @@
     height: 1.5px;
     border-radius: 999px;
     background: currentColor;
-    transition: transform 0.16s ease;
+    transition: transform var(--transition-fast);
   }
 
   .select-chevron::before {

@@ -32,7 +32,12 @@
     border-radius: 9px;
     background: #ffffff;
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition:
+      border-color var(--transition-fast),
+      background var(--transition-fast),
+      color var(--transition-fast),
+      box-shadow var(--transition-fast),
+      transform var(--transition-fast);
   }
 
   .candidate-card:hover {

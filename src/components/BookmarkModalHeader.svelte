@@ -45,7 +45,7 @@
     color: #0f172a;
     cursor: pointer;
     font-size: 13px;
-    transition: 0.18s ease;
+    transition: var(--transition-base);
   }
 
   .ghost-button:disabled {

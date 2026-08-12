@@ -177,9 +177,9 @@
     font: inherit;
     font-size: 14px;
     transition:
-      border-color 0.18s ease,
-      box-shadow 0.18s ease,
-      background 0.18s ease;
+      border-color var(--transition-base),
+      box-shadow var(--transition-base),
+      background var(--transition-base);
   }
 
   .engine-icon-control input:focus {

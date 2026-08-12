@@ -184,7 +184,7 @@
     padding: 7px 12px;
     font-size: 13px;
     cursor: pointer;
-    transition: 0.18s ease;
+    transition: var(--transition-base);
     border: 1px solid #cbd5e1;
     background: #ffffff;
     color: #0f172a;
