@@ -19,6 +19,15 @@
 - [性能契约](reference/PERFORMANCE_CONTRACT.md)
 - [性能测试](reference/PERFORMANCE_TESTING.md)
 
+## 开发计划与决策记录
+
+`plans/` 保存已完成轮次的计划文档。它们不是待办清单，而是决策记录——说明当初
+为什么这么改、哪些约束在后续修改中必须继续遵守，以及哪些验证还没补齐。
+每份文档文首都标注了状态和对应的实现提交。
+
+- [平台优化（加载 / 安全 / 冗余 / UI / 结构）](plans/PLATFORM_OPTIMIZATION_PLAN.md)
+- [后台管理移动端布局](plans/ADMIN_MOBILE_LAYOUT_PLAN.md)
+
 ## 图片
 
 - `screenshots/`：README 当前使用的产品截图。
