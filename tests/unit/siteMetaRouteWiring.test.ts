@@ -29,6 +29,16 @@ describe('site meta route wiring', () => {
     expect(routes).toContain('SITE_META_DEADLINE_MS')
   })
 
+  it('resolves manifest icons between html links and the favicon.ico fallback', () => {
+    expect(routes).toContain('extractManifestUrl')
+    expect(routes).toContain('fetchManifestJson')
+    expect(routes).toContain('extractManifestIcons')
+    const manifestAt = routes.indexOf('extractManifestUrl(page.html')
+    const originFaviconAt = routes.indexOf('${fallbackOrigin}/favicon.ico')
+    expect(manifestAt).toBeGreaterThan(0)
+    expect(manifestAt).toBeLessThan(originFaviconAt)
+  })
+
   it('wires the blur trigger and the single-instance requestId reset', () => {
     const baseFields = readFileSync('src/components/BookmarkBaseFields.svelte', 'utf8')
     const modal = readFileSync('src/components/BookmarkEditModal.svelte', 'utf8')
