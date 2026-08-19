@@ -8,6 +8,7 @@ import {
   parseTargetUrl,
   pickBookmarkTitle,
 } from '../lib/pageMetadata'
+import { extractManifestIcons, extractManifestUrl, fetchManifestJson } from '../lib/webManifest'
 import { cacheResponse, getCachedResponse } from '../lib/iconResponses'
 import { ok } from '../lib/response'
 import { badRequest } from '../lib/routeHelpers'
@@ -62,7 +63,7 @@ faviconRoutes.get('/fetch-favicon', async (c) => {
     return badRequest(c, 'invalid url')
   }
 
-  // 解析逻辑：站内 <link> → /favicon.ico → Google 兜底。
+  // 解析逻辑：站内 <link> → manifest.icons → /favicon.ico → favicon.im 兜底。
   async function resolveIcon(): Promise<string> {
     let fallbackOrigin = targetUrl!.origin
     let fallbackHostname = targetUrl!.hostname
@@ -78,6 +79,18 @@ faviconRoutes.get('/fetch-favicon', async (c) => {
         for (const candidate of candidates) {
           if (await canFetchIcon(candidate)) {
             return candidate
+          }
+        }
+
+        // 页面没有可用 <link rel=icon> 时，再解析站点 manifest 里声明的图标。
+        const manifestUrl = extractManifestUrl(page.html, page.finalUrl)
+        if (manifestUrl) {
+          const manifest = await fetchManifestJson(manifestUrl)
+          const icons = manifest ? extractManifestIcons(manifest, manifestUrl) : []
+          for (const icon of icons) {
+            if (await canFetchIcon(icon.url)) {
+              return icon.url
+            }
           }
         }
       }
