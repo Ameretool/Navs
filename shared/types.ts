@@ -302,7 +302,7 @@ export interface BookmarkUpsertReq {
 
 // GET /api/fetch-favicon?url=...
 export interface FaviconResp {
-  icon: string // 解析到的“直接”图标 URL（方式1；失败回退 Google）
+  icon: string // 解析到的站点图标 URL；失败时回退 favicon.im
 }
 
 // GET /api/fetch-site-meta?url=...

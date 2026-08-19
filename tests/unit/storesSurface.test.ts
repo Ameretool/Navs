@@ -57,8 +57,8 @@ describe('api client surface', () => {
     expect(api.settings).not.toHaveProperty('get')
   })
 
-  it('drops the favicon helper whose UI button was removed in 123b1cf', () => {
-    expect(api.bookmarks).not.toHaveProperty('fetchFavicon')
+  it('exposes favicon lookup used by bookmark creation', () => {
+    expect(api.bookmarks).toHaveProperty('fetchFavicon')
   })
 
   it('keeps the server routes that the smoke test exercises', () => {

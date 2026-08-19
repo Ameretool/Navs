@@ -11,6 +11,7 @@ import {
   type CategoryUpsertReq,
   type ChangePasswordReq,
   type DataVersionResp,
+  type FaviconResp,
   type IconifySearchResp,
   type ImportReq,
   type ImportResp,
@@ -25,7 +26,7 @@ import {
   type SortReq,
 } from '../../shared/types'
 
-export interface StoredAuthSession extends LoginResp {}
+export interface StoredAuthSession extends LoginResp { }
 
 export interface ApiErrorOptions {
   status?: number
@@ -371,6 +372,11 @@ export const bookmarksApi = {
   sort: (ids: SortReq['ids']) => jsonRequest<null>('/bookmarks/sort', 'POST', { ids }, true),
   checkHealth: (ids: number[]) =>
     jsonRequest<Array<{ id: number; status: number | string; ok: boolean }>>('/bookmarks/check-health', 'POST', { ids }, true),
+  fetchFavicon: (url: string) =>
+    request<FaviconResp>(`/fetch-favicon?url=${encodeURIComponent(url)}`, {
+      auth: true,
+      keepSessionOnUnauthorized: true,
+    }),
   fetchSiteMeta: (url: string) =>
     request<SiteMetaResp>(`/fetch-site-meta?url=${encodeURIComponent(url)}`, {
       auth: true,

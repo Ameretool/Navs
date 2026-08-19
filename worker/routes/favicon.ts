@@ -29,15 +29,9 @@ async function canFetchIcon(url: string): Promise<boolean> {
       },
     })
 
-    if (headResponse.ok) {
-      return true
-    }
-
-    if (headResponse.status !== 403 && headResponse.status !== 405) {
-      return false
-    }
+    if (headResponse.ok) return true
   } catch {
-    // Some hosts reject or mishandle HEAD; fall through to a tiny GET probe.
+    // Some hosts reject or mishandle HEAD; always fall through to a tiny GET probe.
   }
 
   try {
